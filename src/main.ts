@@ -32,6 +32,7 @@ class Game {
   private bgLayerMid!: PIXI.Container;
   private gameplayLayer!: PIXI.Container;
   private shadowLayer!: PIXI.Container;
+  private lightLayer!: PIXI.Container;
   private postProcessLayer!: PIXI.Container;
 
   // Input & State
@@ -68,12 +69,35 @@ class Game {
     this.bgLayerMid = new PIXI.Container();
     this.gameplayLayer = new PIXI.Container();
     this.shadowLayer = new PIXI.Container();
+    this.lightLayer = new PIXI.Container();
 
     this.postProcessLayer.addChild(this.skyLayer);
     this.postProcessLayer.addChild(this.bgLayerFar);
     this.postProcessLayer.addChild(this.bgLayerMid);
     this.postProcessLayer.addChild(this.gameplayLayer);
     this.postProcessLayer.addChild(this.shadowLayer);
+    this.postProcessLayer.addChild(this.lightLayer);
+
+    // 2D Light Texture Generator (Radial Gradient)
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 512;
+    const ctx = canvas.getContext('2d')!;
+    const grd = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+    grd.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, 512, 512);
+    const lightTex = PIXI.Texture.from(canvas);
+
+    // Giant Sun Light
+    const sunLight = new PIXI.Sprite(lightTex);
+    sunLight.anchor.set(0.5);
+    sunLight.scale.set(6.0); // Huge glow
+    sunLight.tint = 0xffeebb; // Warm sunlight
+    sunLight.blendMode = 'add';
+    sunLight.alpha = 0.8;
+    sunLight.position.set(400, -200);
+    this.lightLayer.addChild(sunLight);
 
     // Dappled Shadow Setup (Multiply Blend Mode)
     const shadowOverlay = new PIXI.Graphics();
@@ -94,7 +118,7 @@ class Game {
     this.world = new this.rapier.World(gravity);
 
     // Create Robot Arm
-    this.robotArm = new RobotArm(this.gameplayLayer, this.world, this.rapier);
+    this.robotArm = new RobotArm(this.gameplayLayer, this.lightLayer, lightTex, this.world, this.rapier);
     
     // Level Manager
     this.levelManager = new LevelManager(this.uiManager, this.robotArm);
@@ -195,8 +219,11 @@ class Game {
     this.gameplayLayer.x = cx - this.cameraPos.x * ppm;
     this.gameplayLayer.y = cy - (-this.cameraPos.y * ppm);
 
+    // Sync Lighting & Shadows to Camera
     this.shadowLayer.x = this.gameplayLayer.x;
     this.shadowLayer.y = this.gameplayLayer.y;
+    this.lightLayer.x = this.gameplayLayer.x;
+    this.lightLayer.y = this.gameplayLayer.y;
 
     // Parallax - Midground (Trees)
     this.bgLayerMid.x = cx - this.cameraPos.x * ppm * 0.5;
