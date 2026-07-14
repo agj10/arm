@@ -39,7 +39,7 @@ export class LevelManager {
         break;
         
       case 'DROP':
-        if (py < -50) {
+        if (py < -1400) {
           this.state = 'UNDERGROUND';
           this.uiManager.clearSubtitle();
           this.uiManager.showAreaTitle('공장 지하 구역');

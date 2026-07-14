@@ -138,9 +138,9 @@ export class RobotArm {
         this.isAttached = true;
         this.clawPos.set(currentPos.x, -5); 
         this.clawVelocity.set(0, 0);
-      } else if (currentPos.y <= -59.1 && currentPos.x >= 150) { // Hit factory floor
+      } else if (currentPos.y <= -1499.1 && currentPos.x >= 150) { // Hit factory floor
         this.isAttached = true;
-        this.clawPos.set(currentPos.x, -60);
+        this.clawPos.set(currentPos.x, -1500);
         this.clawVelocity.set(0, 0);
       }
     }

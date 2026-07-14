@@ -4,7 +4,6 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { RobotArm } from './RobotArm';
 import { UIManager } from './UIManager';
@@ -94,9 +93,7 @@ class Game {
     const bokehPass = new BokehPass(this.scene, this.camera, {
       focus: 45.0,
       aperture: 0.0001,
-      maxblur: 0.01,
-      width: window.innerWidth,
-      height: window.innerHeight
+      maxblur: 0.01
     });
     this.composer.addPass(bokehPass);
 
@@ -151,11 +148,11 @@ class Game {
     const factoryMat = new THREE.MeshStandardMaterial({ color: 0x444455, roughness: 0.8 });
     const floorGeo2 = new THREE.PlaneGeometry(800, 20);
     const floorMesh2 = new THREE.Mesh(floorGeo2, factoryMat);
-    floorMesh2.position.set(550, -70, 0); // Drop down, top at -60
+    floorMesh2.position.set(550, -1510, 0); // Drop down 1500 units, top at -1500
     floorMesh2.receiveShadow = true;
     this.scene.add(floorMesh2);
 
-    const floorBodyDesc2 = this.rapier.RigidBodyDesc.fixed().setTranslation(550, -70);
+    const floorBodyDesc2 = this.rapier.RigidBodyDesc.fixed().setTranslation(550, -1510);
     const floorBody2 = this.world.createRigidBody(floorBodyDesc2);
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(400, 10), floorBody2);
 
@@ -198,8 +195,8 @@ class Game {
     }
     
     // Boundaries to prevent escaping
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 100), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-20, 30))); // Left
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 100), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(950, 30))); // Right
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-20, -500))); // Left
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(950, -500))); // Right
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(500, 5), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(400, 60))); // Ceiling
 
     // Background parallax layers
