@@ -9,7 +9,7 @@ export class RobotArm {
   private jointMeshes: THREE.Mesh[] = [];
   
   private joints: THREE.Vector2[] = [];
-  private armLengths: number[] = [1.5, 1.5, 1.5];
+  private armLengths: number[] = [2.5, 2.5, 2.5];
 
   public clawPos: THREE.Vector2;
   private rigidBody: RAPIER.RigidBody;
@@ -35,13 +35,13 @@ export class RobotArm {
     this.bodyMesh.castShadow = true;
     scene.add(this.bodyMesh);
 
-    this.clawMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), rustMat);
+    this.clawMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), rustMat);
     this.clawMesh.position.z = 0.1;
     this.clawMesh.castShadow = true;
     scene.add(this.clawMesh);
 
     for (let i = 0; i < 3; i++) {
-      const cylGeo = new THREE.PlaneGeometry(0.4, 1);
+      const cylGeo = new THREE.PlaneGeometry(0.5, 1);
       cylGeo.translate(0, 0.5, 0); 
       const mesh = new THREE.Mesh(cylGeo, armMat);
       mesh.position.z = 0.15;
@@ -53,7 +53,7 @@ export class RobotArm {
     this.joints.push(new THREE.Vector2()); 
 
     for (let i = 0; i < 2; i++) {
-      const jMesh = new THREE.Mesh(new THREE.CircleGeometry(0.3, 16), rustMat);
+      const jMesh = new THREE.Mesh(new THREE.CircleGeometry(0.4, 16), rustMat);
       jMesh.position.z = 0.18;
       scene.add(jMesh);
       this.jointMeshes.push(jMesh);
@@ -98,8 +98,16 @@ export class RobotArm {
     } else {
       // Flying
       const currentPos = this.rigidBody.translation();
-      // Claw trails behind the body loosely
-      this.clawPos.lerp(new THREE.Vector2(currentPos.x - this.velocity.x * 0.05, currentPos.y + 1), 0.2);
+      const currentVel = this.rigidBody.linvel();
+      
+      // Claw trails behind the body based on ACTUAL velocity, creating a straight rigid rod effect
+      const trailVector = new THREE.Vector2(-currentVel.x, -currentVel.y);
+      if (trailVector.length() > 0.1) {
+        trailVector.normalize().multiplyScalar(5);
+      } else {
+        trailVector.set(0, 5); // Straight up if very slow
+      }
+      this.clawPos.lerp(new THREE.Vector2(currentPos.x + trailVector.x, currentPos.y + trailVector.y), 0.3);
       
       // Simple floor collision check
       // Body radius is 0.8. Floor top is -5. 
@@ -140,8 +148,8 @@ export class RobotArm {
       const dir = target.clone().sub(base).normalize();
       const normal = new THREE.Vector2(-dir.y, dir.x);
       
-      // Curve height proportional to how compressed it is
-      const height = Math.sqrt(maxDist * maxDist - dist * dist) * 0.4;
+      // Curve height proportional to how compressed it is, reduced for flatter look
+      const height = Math.sqrt(maxDist * maxDist - dist * dist) * 0.25;
       const control = mid.add(normal.multiplyScalar(height));
 
       // Quadratic bezier sampling
