@@ -8,7 +8,7 @@ export class LightingSystem {
   
   public lightContainer: PIXI.Container;
   private lightGraphics: PIXI.Graphics;
-  private lightSprite: PIXI.Sprite;
+  private gradientTexture: PIXI.Texture;
 
   private rayCount: number = 720; 
   private maxDistance: number = 100;
@@ -20,70 +20,70 @@ export class LightingSystem {
     this.lightContainer = new PIXI.Container();
     this.lightContainer.blendMode = 'add';
     
-    // Create a smooth radial gradient texture
+    // Create a smooth radial gradient texture for light falloff (attenuation)
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
+    canvas.width = 1024;
+    canvas.height = 1024;
     const ctx = canvas.getContext('2d')!;
-    const grd = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
-    grd.addColorStop(0, "rgba(255, 160, 80, 0.35)"); // Softer orange, matches previous look
-    grd.addColorStop(1, "rgba(255, 160, 80, 0.0)"); // Fades out
+    const grd = ctx.createRadialGradient(512, 512, 0, 512, 512, 512);
+    grd.addColorStop(0, "rgba(255, 160, 80, 1.0)"); // Warm orange core
+    grd.addColorStop(1, "rgba(255, 160, 80, 0.0)"); // Fades out completely at 512px
     ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, 512, 512);
-    
-    const texture = PIXI.Texture.from(canvas);
-    this.lightSprite = new PIXI.Sprite(texture);
-    this.lightSprite.anchor.set(0.5);
-    // Make the sprite large so it fades out smoothly across the screen
-    this.lightSprite.width = 3000;
-    this.lightSprite.height = 3000;
-    
-    this.lightGraphics = new PIXI.Graphics();
-    
-    // The polygon acts as a sharp mask, but the light itself is a soft radial gradient!
-    this.lightSprite.mask = this.lightGraphics;
+    ctx.fillRect(0, 0, 1024, 1024);
+    this.gradientTexture = PIXI.Texture.from(canvas);
 
-    this.lightContainer.addChild(this.lightGraphics); 
-    this.lightContainer.addChild(this.lightSprite);
+    this.lightGraphics = new PIXI.Graphics();
+    this.lightContainer.addChild(this.lightGraphics);
   }
 
   public update(lightPos: Vec2) {
     this.lightGraphics.clear();
     
-    const originX = lightPos.x;
-    const originY = lightPos.y;
+    const color = 0xffa050; 
+    const alpha = 0.04; 
+    const samples = 8;
+    // Tiny radius eliminates circular artifact at start, but still creates blur over distance
+    const lightRadius = 0.05; 
+
+    for (let s = 0; s < samples; s++) {
+      const sampleAngle = (s / samples) * Math.PI * 2;
+      const offsetX = Math.cos(sampleAngle) * lightRadius;
+      const offsetY = Math.sin(sampleAngle) * lightRadius;
+
+      const originX = lightPos.x + offsetX;
+      const originY = lightPos.y + offsetY;
 
       const points: {x: number, y: number}[] = [];
 
       for (let i = 0; i < this.rayCount; i++) {
         const angle = (i / this.rayCount) * Math.PI * 2;
         const dir = { x: Math.cos(angle), y: Math.sin(angle) };
-
-        const ray = new this.rapier.Ray(
-          { x: originX, y: originY },
-          dir
-        );
-
-        // Cast ray against ALL objects including player (so arm casts shadow!)
-        // solid = false: rays originating inside a collider ignore it and escape!
-        const hit = this.world.castRay(ray, this.maxDistance, false);
+        const ray = new this.rapier.Ray({ x: originX, y: originY }, dir);
         
+        // Exclude Dynamic objects so the RobotArm doesn't cast shadows on itself and mask out the light!
+        const hit = this.world.castRay(ray, this.maxDistance, false, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
+
         let hitX, hitY;
         if (hit) {
-          const toi = (hit as any).toi ?? (hit as any).timeOfImpact ?? (hit as any).time_of_impact ?? this.maxDistance;
+          const toi = (hit as any).toi ?? (hit as any).timeOfImpact ?? this.maxDistance;
           hitX = originX + dir.x * toi;
           hitY = originY + dir.y * toi;
         } else {
           hitX = originX + dir.x * this.maxDistance;
           hitY = originY + dir.y * this.maxDistance;
         }
-        
+
         points.push({ x: hitX * 40, y: -hitY * 40 });
       }
 
-      this.lightGraphics.poly(points).fill(0xffffff); // White color for masking
-      
-      // Move the radial gradient to the light origin
-      this.lightSprite.position.set(originX * 40, -originY * 40);
+      // Use the radial gradient texture to provide natural light falloff
+      const matrix = new PIXI.Matrix();
+      matrix.translate(originX * 40 - 512, -originY * 40 - 512);
+      this.lightGraphics.poly(points).fill({ 
+        texture: this.gradientTexture, 
+        alpha: 0.12, 
+        matrix: matrix 
+      });
+    }
   }
 }

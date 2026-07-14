@@ -92,52 +92,54 @@ export class RobotArm {
     const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
 
     if (this.isAttached) {
+      this.rigidBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
       this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
       this.clawBody.setTranslation({ x: this.clawPos.x, y: this.clawPos.y }, true);
 
-      if (isMouseDown) {
-        this.rigidBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
-        
-        let clampedMousePos = mousePos.clone();
-        if (clampedMousePos.distanceTo(this.clawPos) > maxDist) {
-          const dir = clampedMousePos.clone().sub(this.clawPos).normalize();
-          clampedMousePos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
-        }
-
-        // Base directly follows the mouse for perfect dragging
-        this.rigidBody.setTranslation({ x: clampedMousePos.x, y: clampedMousePos.y }, true);
-      } else {
-        // Base hangs freely
-        this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
+      let clampedMousePos = mousePos.clone();
+      if (clampedMousePos.distanceTo(this.clawPos) > maxDist) {
+        const dir = clampedMousePos.clone().sub(this.clawPos).normalize();
+        clampedMousePos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
       }
 
+      // Base always tracks the mouse oppositely for slingshot aiming
+      const targetX = this.clawPos.x - (clampedMousePos.x - this.clawPos.x);
+      const targetY = this.clawPos.y - (clampedMousePos.y - this.clawPos.y);
+      this.rigidBody.setTranslation({ x: targetX, y: targetY }, true);
+
       if (this.prevIsMouseDown && !isMouseDown) {
+        // Shoots!
         this.isAttached = false;
+        this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
         this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
         
-        // Massive velocity to BOTH base and claw!
         const basePos = this.rigidBody.translation();
         const pullX = this.clawPos.x - basePos.x;
         const pullY = this.clawPos.y - basePos.y;
         
-        // Set linear velocity to guarantee launch regardless of internal type-switch state
         this.rigidBody.setLinvel({ x: pullX * 12, y: pullY * 12 }, true);
         this.clawBody.setLinvel({ x: pullX * 12, y: pullY * 12 }, true);
       }
     } else {
-      // Flying - Rapier Rope Joint automatically keeps them connected!
+      // Flying
       const bodyPos = this.rigidBody.translation();
       const cPos = this.clawBody.translation();
       this.clawPos.set(cPos.x, cPos.y);
 
-      // Auto-attach on collision with any fixed geometry
-      const dirs = [{x:0,y:-0.7}, {x:0,y:0.7}, {x:-0.7,y:0}, {x:0.7,y:0}];
+      // Auto-attach on collision (with precise snapping to avoid floating)
+      const dirs = [{x:0,y:-1}, {x:0,y:1}, {x:-1,y:0}, {x:1,y:0}];
       let touched = false;
       for (const d of dirs) {
         const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, d);
-        const hit = this.world.castRay(ray, 0.7, true, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
-        if (hit) {
+        const hit = this.world.castRay(ray, 0.65, true, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
+        if (hit && !isNaN((hit as any).toi)) {
           touched = true;
+          const toi = (hit as any).toi;
+          const snapDist = toi - 0.58; 
+          if (snapDist > 0) {
+            cPos.x += d.x * snapDist;
+            cPos.y += d.y * snapDist;
+          }
           break;
         }
       }
@@ -149,7 +151,6 @@ export class RobotArm {
         this.clawBody.setLinvel({ x: 0, y: 0 }, true);
         this.clawBody.setAngvel(0, true);
       } else if (bodyPos.y <= -1499.1 && bodyPos.x >= 150) { 
-        // Abyss safety net
         this.isAttached = true;
         this.clawPos.set(bodyPos.x, -1500);
         this.clawBody.setTranslation({ x: bodyPos.x, y: -1500 }, true);
