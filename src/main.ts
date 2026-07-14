@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js';
+
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader.js';
 import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectionShader.js';
@@ -17,7 +17,7 @@ fetch('/version.json')
   .then(data => {
     const versionDisplay = document.getElementById('version-display');
     if (versionDisplay) {
-      versionDisplay.textContent = `ver. ${data.version}`;
+      versionDisplay.textContent = data.version;
     }
   })
   .catch(e => console.error('Failed to load version.json', e));
@@ -80,11 +80,11 @@ class Game {
     const renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(renderPass);
 
-    const ssaoPass = new SSAOPass(this.scene, this.camera, window.innerWidth, window.innerHeight);
-    ssaoPass.kernelRadius = 16;
-    ssaoPass.minDistance = 0.005;
-    ssaoPass.maxDistance = 0.1;
-    this.composer.addPass(ssaoPass);
+    // const ssaoPass = new SSAOPass(this.scene, this.camera, window.innerWidth, window.innerHeight);
+    // ssaoPass.kernelRadius = 16;
+    // ssaoPass.minDistance = 0.005;
+    // ssaoPass.maxDistance = 0.1;
+    // this.composer.addPass(ssaoPass);
 
     const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
     bloomPass.threshold = 0.2;
