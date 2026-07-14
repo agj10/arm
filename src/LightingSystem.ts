@@ -21,8 +21,11 @@ export class LightingSystem {
     this.rapier = rapierModule;
 
     this.lightContainer = new PIXI.Container();
-    // Force container to render offscreen so children blend together first
-    this.lightContainer.filters = [new PIXI.AlphaFilter({ alpha: 1.0 })];
+    // Force container to render offscreen and pixelate the entire lighting pass
+    this.lightContainer.filters = [
+      new PIXI.AlphaFilter({ alpha: 1.0 }),
+      new PixelateFilter([4, 4])
+    ];
     this.lightContainer.blendMode = 'add';
     
     this.lightGraphics = new PIXI.Graphics();
@@ -39,8 +42,6 @@ export class LightingSystem {
       });
       // Multiply blend mode cuts out the light where leaves are black
       this.leafOverlay.blendMode = 'multiply';
-      // Pixelate and increase density
-      this.leafOverlay.filters = [new PixelateFilter([4, 4])];
       this.leafOverlay.tileScale.set(0.35); 
       this.leafOverlay.position.set(-2000, -2000);
       this.lightContainer.addChild(this.leafOverlay);
