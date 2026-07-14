@@ -16,13 +16,14 @@ export class RobotArm {
 
   private isAttached: boolean = true;
   private prevIsMouseDown: boolean = false;
-  private prevBodyPos: THREE.Vector2 = new THREE.Vector2();
-  private velocity: THREE.Vector2 = new THREE.Vector2();
 
   private rapier: typeof RAPIER;
+  private world: RAPIER.World;
+  private clawVelocity: THREE.Vector2 = new THREE.Vector2();
   
   constructor(scene: THREE.Scene, world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
+    this.world = world;
     this.clawPos = new THREE.Vector2(0, -5); // Start attached to floor top
 
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.7, side: THREE.DoubleSide });
@@ -65,14 +66,13 @@ export class RobotArm {
     world.createCollider(colliderDesc, this.rigidBody);
   }
 
-  private clawVelocity: THREE.Vector2 = new THREE.Vector2();
-
   public update(mousePos: THREE.Vector2, isMouseDown: boolean) {
+    const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
+
     if (this.isAttached) {
-      this.rigidBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
+      this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
 
       // Body follows mouse symmetrically
-      const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
       let clampedMousePos = mousePos.clone();
       if (clampedMousePos.distanceTo(this.clawPos) > maxDist) {
         const dir = clampedMousePos.clone().sub(this.clawPos).normalize();
@@ -82,39 +82,51 @@ export class RobotArm {
       const targetX = this.clawPos.x - (clampedMousePos.x - this.clawPos.x);
       const targetY = this.clawPos.y - (clampedMousePos.y - this.clawPos.y);
 
-      this.rigidBody.setTranslation({ x: targetX, y: targetY }, true);
-      this.rigidBody.setLinvel({ x: 0, y: 0 }, true);
-
-      // Track velocity
-      this.velocity.x = (targetX - this.prevBodyPos.x) / 0.016;
-      this.velocity.y = (targetY - this.prevBodyPos.y) / 0.016;
-      this.prevBodyPos.set(targetX, targetY);
+      const currentPos = this.rigidBody.translation();
+      const springForceX = (targetX - currentPos.x) * 15;
+      const springForceY = (targetY - currentPos.y) * 15;
+      
+      // Fast velocity-based following
+      this.rigidBody.setLinvel({ x: springForceX, y: springForceY }, true);
 
       // Swing Release
       if (this.prevIsMouseDown && !isMouseDown) {
         this.isAttached = false;
-        this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
-        // Throw!
-        this.rigidBody.setLinvel({ x: this.velocity.x, y: this.velocity.y }, true);
+        // No need to set linvel, it already has the actual physics velocity!
       }
     } else {
       // Flying
       const currentPos = this.rigidBody.translation();
-      const currentVel = this.rigidBody.linvel();
       
-      const trailVector = new THREE.Vector2(-currentVel.x, -currentVel.y);
-      if (trailVector.length() > 0.1) {
-        trailVector.normalize().multiplyScalar(5);
+      // Claw aims towards mouse cursor
+      let dir = mousePos.clone().sub(new THREE.Vector2(currentPos.x, currentPos.y));
+      if (dir.lengthSq() > 0.01) {
+        dir.normalize();
       } else {
-        trailVector.set(0, 5); // Straight up if very slow
+        dir.set(0, 1);
       }
+      const targetClawPos = new THREE.Vector2(currentPos.x + dir.x * maxDist, currentPos.y + dir.y * maxDist);
       
-      // Smoothly interpolate claw towards trailing position instead of teleporting
-      const targetClawPos = new THREE.Vector2(currentPos.x + trailVector.x, currentPos.y + trailVector.y);
+      // Smoothly interpolate claw towards aim direction
       const diff = targetClawPos.sub(this.clawPos);
-      this.clawVelocity.add(diff.multiplyScalar(0.05));
-      this.clawVelocity.multiplyScalar(0.85); // damping
+      this.clawVelocity.add(diff.multiplyScalar(0.1));
+      this.clawVelocity.multiplyScalar(0.7); // damping
       this.clawPos.add(this.clawVelocity);
+      
+      // Snap Raycast on Click
+      if (!this.prevIsMouseDown && isMouseDown) {
+        const ray = new this.rapier.Ray({ x: this.clawPos.x, y: this.clawPos.y }, { x: dir.x, y: dir.y });
+        const maxToi = maxDist * 1.5; // Snap range limit
+        const solid = true;
+        const hit = this.world.castRay(ray, maxToi, solid, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
+        
+        if (hit) {
+          const hitPoint = ray.pointAt((hit as any).toi);
+          this.isAttached = true;
+          this.clawPos.set(hitPoint.x, hitPoint.y);
+          this.clawVelocity.set(0, 0);
+        }
+      }
       
       // Simple floor collision check
       // Body radius is 0.8. Floor top is -5. 
@@ -122,7 +134,6 @@ export class RobotArm {
         this.isAttached = true;
         this.clawPos.set(currentPos.x, -5); // attach to floor top
         this.clawVelocity.set(0, 0);
-        this.prevBodyPos.set(currentPos.x, currentPos.y);
       }
     }
 

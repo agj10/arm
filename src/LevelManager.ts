@@ -23,14 +23,14 @@ export class LevelManager {
 
     switch (this.state) {
       case 'FOREST':
-        if (px > 30) { 
+        if (px > 150) { 
           this.state = 'FACTORY_ENTRANCE';
           this.uiManager.showAreaTitle('무너진 공장');
         }
         break;
       
       case 'FACTORY_ENTRANCE':
-        if (px > 60) { 
+        if (px > 250) { 
           this.state = 'CONVEYOR';
           this.timer = 0;
           this.uiManager.showSubtitle('자연에 파묻힌 이 곳... 컨베이어 벨트가 아직 작동하고 있다...', true);
