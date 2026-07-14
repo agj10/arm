@@ -63,10 +63,10 @@ class Game {
     container.appendChild(this.renderer.domElement);
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
     this.scene.add(ambientLight);
 
-    this.dirLight = new THREE.DirectionalLight(0xffffe0, 1.5);
+    this.dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
     this.dirLight.position.set(10, 30, 20);
     this.dirLight.castShadow = true;
     this.dirLight.shadow.camera.top = 100;
@@ -173,20 +173,20 @@ class Game {
       this.world.createCollider(blockColliderDesc, blockBody);
     }
     
-    // Trees
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3b2c, roughness: 1.0 });
-    const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d4c1e, roughness: 0.8 });
+    // Trees (2D Sprites)
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6a4b3a, roughness: 1.0, side: THREE.DoubleSide });
+    const leavesMat = new THREE.MeshStandardMaterial({ color: 0x4d8c3e, roughness: 1.0, side: THREE.DoubleSide });
     for (let i = 0; i < 10; i++) {
       const tx = Math.random() * 120;
       
-      const trunkGeo = new THREE.CylinderGeometry(0.5, 0.8, 5);
+      const trunkGeo = new THREE.PlaneGeometry(1, 5);
       const trunkMesh = new THREE.Mesh(trunkGeo, trunkMat);
       trunkMesh.position.set(tx, -2.5, -5 - Math.random() * 5);
       trunkMesh.castShadow = true;
       trunkMesh.receiveShadow = true;
       this.scene.add(trunkMesh);
       
-      const leavesGeo = new THREE.ConeGeometry(3, 8);
+      const leavesGeo = new THREE.PlaneGeometry(6, 8);
       const leavesMesh = new THREE.Mesh(leavesGeo, leavesMat);
       leavesMesh.position.set(tx, 4, trunkMesh.position.z);
       leavesMesh.castShadow = true;
