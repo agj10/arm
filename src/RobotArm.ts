@@ -23,7 +23,6 @@ export class RobotArm {
 
   private rapier: typeof RAPIER;
   private world: RAPIER.World;
-  private clawGlow: PIXI.Sprite;
   
   constructor(container: PIXI.Container, lightLayer: PIXI.Container, lightTex: PIXI.Texture, world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
@@ -53,15 +52,6 @@ export class RobotArm {
       container.addChild(jMesh);
       this.jointMeshes.push(jMesh);
     }
-
-    // Light Source for Claw
-    this.clawGlow = new PIXI.Sprite(lightTex);
-    this.clawGlow.anchor.set(0.5);
-    this.clawGlow.scale.set(0.8);
-    this.clawGlow.tint = 0x00ffff; // Cyan neon glow
-    this.clawGlow.blendMode = 'add';
-    this.clawGlow.alpha = 0.6;
-    lightLayer.addChild(this.clawGlow);
 
     // Body
     const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -1);
@@ -156,7 +146,6 @@ export class RobotArm {
     const pos = this.rigidBody.translation();
     this.bodyMesh.position.set(pos.x * 40, -pos.y * 40); 
     this.clawMesh.position.set(this.clawPos.x * 40, -this.clawPos.y * 40);
-    this.clawGlow.position.set(this.clawPos.x * 40, -this.clawPos.y * 40);
 
     this.updateIK();
   }
