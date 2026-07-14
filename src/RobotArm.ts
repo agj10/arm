@@ -115,21 +115,24 @@ export class RobotArm {
       this.clawVelocity.multiplyScalar(0.7); // damping
       this.clawPos.add(this.clawVelocity);
       
-      // Snap Raycast on Click
-      if (!this.prevIsMouseDown && isMouseDown) {
-        const ray = new this.rapier.Ray({ x: this.clawPos.x, y: this.clawPos.y }, { x: dir.x, y: dir.y });
-        const maxToi = maxDist * 1.5; // Snap range limit
-        const solid = true;
-        const hit = this.world.castRay(ray, maxToi, solid, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
-        
-        if (hit) {
-          const hitPoint = new THREE.Vector2(
-            ray.origin.x + ray.dir.x * (hit as any).toi,
-            ray.origin.y + ray.dir.y * (hit as any).toi
-          );
-          this.isAttached = true;
-          this.clawPos.set(hitPoint.x, hitPoint.y);
-          this.clawVelocity.set(0, 0);
+      if (isMouseDown && !this.prevIsMouseDown) { // Just clicked
+        const dir = pos.clone().sub(this.clawPos);
+        if (dir.lengthSq() > 0.001) {
+          dir.normalize();
+          const ray = new this.rapier.Ray({ x: this.clawPos.x, y: this.clawPos.y }, { x: dir.x, y: dir.y });
+          const maxToi = maxDist * 1.5; // 7.5 * 1.5 = 11.25
+          const solid = true;
+          const hit = this.world.castRay(ray, maxToi, solid, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
+          
+          if (hit && !isNaN((hit as any).toi)) {
+            const hitPoint = new THREE.Vector2(
+              ray.origin.x + ray.dir.x * (hit as any).toi,
+              ray.origin.y + ray.dir.y * (hit as any).toi
+            );
+            this.isAttached = true;
+            this.clawPos.set(hitPoint.x, hitPoint.y);
+            this.clawVelocity.set(0, 0);
+          }
         }
       }
       
@@ -151,11 +154,18 @@ export class RobotArm {
     const pos = this.rigidBody.translation();
     this.bodyMesh.position.set(pos.x, pos.y, 0.2);
     
-    // Hard-clamp clawPos to max length to prevent visual separation
+    // Spring-based constraint for claw during flight (natural pull instead of hard clamp)
     const base = new THREE.Vector2(pos.x, pos.y);
-    if (this.clawPos.distanceTo(base) > maxDist) {
+    const dist = this.clawPos.distanceTo(base);
+    if (dist > maxDist) {
       const dir = this.clawPos.clone().sub(base).normalize();
-      this.clawPos.copy(base.clone().add(dir.multiplyScalar(maxDist)));
+      // Apply a strong spring force pulling it back to maxDist
+      const overstretch = dist - maxDist;
+      this.clawVelocity.sub(dir.multiplyScalar(overstretch * 20.0));
+      // Still apply a soft clamp to prevent insane flying apart if velocity gets too high
+      if (overstretch > maxDist * 1.5) {
+        this.clawPos.copy(base.clone().add(dir.normalize().multiplyScalar(maxDist * 1.5)));
+      }
     }
     this.clawMesh.position.set(this.clawPos.x, this.clawPos.y, 0.1);
 

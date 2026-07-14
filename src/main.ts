@@ -47,8 +47,8 @@ class Game {
     
     // Scene setup
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87ceeb); // Bright sky blue
-    this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.005);
+    this.scene.background = new THREE.Color(0xdfefff); // Light sky blue
+    this.scene.fog = new THREE.FogExp2(0xdfefff, 0.005);
 
     // Camera setup (2.5D perspective)
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -63,10 +63,10 @@ class Game {
     container.appendChild(this.renderer.domElement);
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Slightly lowered to let shadows pop
     this.scene.add(ambientLight);
 
-    this.dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    this.dirLight = new THREE.DirectionalLight(0xffffff, 3.5);
     this.dirLight.position.set(10, 30, 20);
     this.dirLight.castShadow = true;
     this.dirLight.shadow.camera.top = 100;
@@ -173,42 +173,43 @@ class Game {
       this.world.createCollider(blockColliderDesc, blockBody);
     }
     
-    // Trees (2D Sprites)
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6a4b3a, roughness: 1.0, side: THREE.DoubleSide });
-    const leavesMat = new THREE.MeshStandardMaterial({ color: 0x4d8c3e, roughness: 1.0, side: THREE.DoubleSide });
-    for (let i = 0; i < 10; i++) {
-      const tx = Math.random() * 120;
-      
-      const trunkGeo = new THREE.PlaneGeometry(1, 5);
-      const trunkMesh = new THREE.Mesh(trunkGeo, trunkMat);
-      trunkMesh.position.set(tx, -2.5, -5 - Math.random() * 5);
-      trunkMesh.castShadow = true;
-      trunkMesh.receiveShadow = true;
-      this.scene.add(trunkMesh);
-      
-      const leavesGeo = new THREE.PlaneGeometry(6, 8);
-      const leavesMesh = new THREE.Mesh(leavesGeo, leavesMat);
-      leavesMesh.position.set(tx, 4, trunkMesh.position.z);
-      leavesMesh.castShadow = true;
-      leavesMesh.receiveShadow = true;
-      this.scene.add(leavesMesh);
-    }
-    
     // Boundaries to prevent escaping
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-20, -500))); // Left
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(950, -500))); // Right
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(500, 5), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(400, 60))); // Ceiling
 
     // Background parallax layers
-    const bgMat1 = new THREE.MeshBasicMaterial({ color: 0x334433 });
+    const bgMat1 = new THREE.MeshBasicMaterial({ color: 0x738473 }); // Lighter green
     const bg1 = new THREE.Mesh(new THREE.PlaneGeometry(300, 50), bgMat1);
     bg1.position.set(50, 10, -10);
     this.scene.add(bg1);
 
-    const bgMat2 = new THREE.MeshBasicMaterial({ color: 0x112211 });
+    const bgMat2 = new THREE.MeshBasicMaterial({ color: 0x516251 }); 
     const bg2 = new THREE.Mesh(new THREE.PlaneGeometry(300, 80), bgMat2);
     bg2.position.set(50, 20, -20);
     this.scene.add(bg2);
+
+    // Giant Background Tree Trunks
+    const hugeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x2a1b0a, roughness: 1.0 });
+    for (let i = 0; i < 6; i++) {
+      const tx = i * 40 - 20;
+      const trunk = new THREE.Mesh(new THREE.PlaneGeometry(15 + Math.random() * 10, 200), hugeTrunkMat);
+      trunk.position.set(tx, 50, -30 - Math.random() * 10);
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
+      this.scene.add(trunk);
+    }
+
+    // Dappled Shadow Canopy (Invisible but casts shadows)
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x224422, side: THREE.DoubleSide });
+    for (let i = 0; i < 200; i++) {
+      const leaf = new THREE.Mesh(new THREE.PlaneGeometry(15 + Math.random() * 20, 15 + Math.random() * 20), leafMat);
+      leaf.position.set(Math.random() * 300 - 50, 40 + Math.random() * 10, Math.random() * 40 - 10);
+      leaf.rotation.x = Math.random() * Math.PI;
+      leaf.rotation.y = Math.random() * Math.PI;
+      leaf.castShadow = true;
+      this.scene.add(leaf);
+    }
   }
 
   private onWindowResize() {
