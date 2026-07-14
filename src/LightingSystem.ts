@@ -8,7 +8,7 @@ export class LightingSystem {
   
   public lightContainer: PIXI.Container;
   private lightGraphics: PIXI.Graphics;
-  private gradientTexture: PIXI.Texture;
+  private lightTexture: PIXI.Texture;
 
   private rayCount: number = 720; 
   private maxDistance: number = 100;
@@ -20,74 +20,73 @@ export class LightingSystem {
     this.lightContainer = new PIXI.Container();
     this.lightContainer.blendMode = 'add';
     
-    // Create a smooth radial gradient texture for light falloff (attenuation)
+    // Create a smooth radial gradient texture
     const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 1024;
+    canvas.width = 512;
+    canvas.height = 512;
     const ctx = canvas.getContext('2d')!;
-    const grd = ctx.createRadialGradient(512, 512, 0, 512, 512, 512);
-    grd.addColorStop(0, "rgba(255, 160, 80, 1.0)"); // Warm orange core
-    grd.addColorStop(1, "rgba(255, 160, 80, 0.0)"); // Fades out completely at 512px
+    const grd = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+    // Use full alpha here, we'll reduce alpha when drawing the polygon
+    grd.addColorStop(0, "rgba(255, 160, 80, 1.0)"); 
+    grd.addColorStop(1, "rgba(255, 160, 80, 0.0)"); 
     ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, 1024, 1024);
+    ctx.fillRect(0, 0, 512, 512);
     
-    this.gradientTexture = PIXI.Texture.from(canvas);
-    // Prevent the texture from tiling/repeating across the sky (which causes flashing when moving)
-    if (this.gradientTexture.source && this.gradientTexture.source.style) {
-        this.gradientTexture.source.style.addressMode = 'clamp-to-edge';
-        this.gradientTexture.source.style.addressModeU = 'clamp-to-edge';
-        this.gradientTexture.source.style.addressModeV = 'clamp-to-edge';
-    }
-
+    this.lightTexture = PIXI.Texture.from(canvas);
     this.lightGraphics = new PIXI.Graphics();
-    this.lightContainer.addChild(this.lightGraphics);
+    
+    this.lightContainer.addChild(this.lightGraphics); 
   }
 
   public update(lightPos: Vec2) {
-    this.lightGraphics.clear();
-    
-    const samples = 8;
-    // Tiny radius eliminates circular artifact at start, but still creates blur over distance
-    const lightRadius = 0.05; 
+    const samples = 12;
+    const lightRadius = 0.15;
+    // Total desired alpha at center is ~0.35. We divide by samples.
+    const alpha = 0.35 / samples; 
 
+    this.lightGraphics.clear();
+
+    // Cast multiple offset rays to create soft penumbra shadows that fade with distance
     for (let s = 0; s < samples; s++) {
       const sampleAngle = (s / samples) * Math.PI * 2;
       const offsetX = Math.cos(sampleAngle) * lightRadius;
       const offsetY = Math.sin(sampleAngle) * lightRadius;
-
       const originX = lightPos.x + offsetX;
       const originY = lightPos.y + offsetY;
 
-      const points: {x: number, y: number}[] = [];
-
+      const points: number[] = [];
+      
       for (let i = 0; i < this.rayCount; i++) {
         const angle = (i / this.rayCount) * Math.PI * 2;
         const dir = { x: Math.cos(angle), y: Math.sin(angle) };
         const ray = new this.rapier.Ray({ x: originX, y: originY }, dir);
         
-        // Exclude Dynamic objects so the RobotArm doesn't cast shadows on itself and mask out the light!
+        // EXCLUDE_DYNAMIC so the player doesn't cast a shadow
         const hit = this.world.castRay(ray, this.maxDistance, false, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
-
-        let hitX, hitY;
+        
         if (hit) {
-          const toi = (hit as any).toi ?? (hit as any).timeOfImpact ?? this.maxDistance;
-          hitX = originX + dir.x * toi;
-          hitY = originY + dir.y * toi;
+          const hitPoint = new Vec2(
+            ray.origin.x + ray.dir.x * hit.toi,
+            ray.origin.y + ray.dir.y * hit.toi
+          );
+          points.push(hitPoint.x * 40, -hitPoint.y * 40);
         } else {
-          hitX = originX + dir.x * this.maxDistance;
-          hitY = originY + dir.y * this.maxDistance;
+          points.push(
+            (ray.origin.x + ray.dir.x * this.maxDistance) * 40,
+            -(ray.origin.y + ray.dir.y * this.maxDistance) * 40
+          );
         }
-
-        points.push({ x: hitX * 40, y: -hitY * 40 });
       }
-
-      // Use the radial gradient texture to provide natural light falloff
+      
       const matrix = new PIXI.Matrix();
-      matrix.translate(originX * 40 - 512, -originY * 40 - 512);
+      matrix.translate(-256, -256); // Center the 512x512 texture
+      matrix.scale(3000 / 512, 3000 / 512); // Scale to 3000x3000
+      matrix.translate(originX * 40, -originY * 40); // Move to the ray origin
+      
       this.lightGraphics.poly(points).fill({ 
-        texture: this.gradientTexture, 
-        alpha: 0.045, // 0.045 * 8 samples = 0.36 max alpha (matches the soft orange look from a1.59!)
-        matrix: matrix 
+        texture: this.lightTexture,
+        matrix: matrix,
+        alpha: alpha
       });
     }
   }
