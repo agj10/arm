@@ -6,7 +6,7 @@ import { LevelManager } from './LevelManager';
 import { LightingSystem } from './LightingSystem';
 import { Vec2 } from './Vec2';
 import * as RAPIER from '@dimforge/rapier2d';
-import { CRTFilter, AdvancedBloomFilter } from 'pixi-filters';
+import { PixelateFilter, AdvancedBloomFilter } from 'pixi-filters';
 
 // Fetch and display version
 fetch('/version.json')
@@ -81,15 +81,8 @@ class Game {
         blur: 8,
         quality: 4
       }),
-      new CRTFilter({
-        curvature: 1.5,
-        lineWidth: 1.0,
-        lineContrast: 0.25,
-        noise: 0.15,
-        vignetting: 0.4,
-        vignettingAlpha: 0.8,
-        vignettingBlur: 0.4,
-        seed: Math.random()
+      new PixelateFilter({
+        size: 3 // Gives a clean, modern pixel art look without CRT artifacts
       })
     ];
 
@@ -212,14 +205,7 @@ class Game {
     this.robotArm.update(this.mousePos, this.isMouseDown);
     this.levelManager.update(deltaTime);
     
-    // Update CRT seed for dynamic noise
-    if (this.app.stage.filters) {
-      const crt = this.app.stage.filters.find(f => f instanceof CRTFilter) as CRTFilter;
-      if (crt) {
-        crt.seed = Math.random();
-        crt.time += deltaTime * 0.05;
-      }
-    }
+    // (Filters are static now, no need to update CRT seeds)
 
     // Update Dynamic Raycast Lighting
     this.lightingSystem.update(this.robotArm.clawPos);
