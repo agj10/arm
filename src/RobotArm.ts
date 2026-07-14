@@ -130,44 +130,6 @@ export class RobotArm {
       const cPos = this.clawBody.translation();
       this.clawPos.set(cPos.x, cPos.y);
 
-      if (isMouseDown && !this.prevIsMouseDown) { 
-        const basePos = this.rigidBody.translation();
-        const dir = mousePos.clone().sub(new Vec2(basePos.x, basePos.y));
-        if (dir.lengthSq() > 0.001) {
-          dir.normalize();
-          
-          let bestHitPoint: Vec2 | null = null;
-          let bestToi = Infinity;
-          const angle = Math.atan2(dir.y, dir.x);
-          
-          // Spread rays over 40 degrees (-20 to +20) for a forgiving grapple
-          for (let i = -2; i <= 2; i++) {
-            const rayAngle = angle + (i * 10 * Math.PI / 180);
-            const rayDir = { x: Math.cos(rayAngle), y: Math.sin(rayAngle) };
-            const ray = new this.rapier.Ray({ x: basePos.x, y: basePos.y }, rayDir);
-            const hit = this.world.castRay(ray, maxDist * 1.5, true, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
-            
-            if (hit && !isNaN((hit as any).toi)) {
-              if ((hit as any).toi < bestToi) {
-                bestToi = (hit as any).toi;
-                bestHitPoint = new Vec2(
-                  ray.origin.x + ray.dir.x * bestToi,
-                  ray.origin.y + ray.dir.y * bestToi
-                );
-              }
-            }
-          }
-
-          if (bestHitPoint) {
-            this.isAttached = true;
-            this.clawPos.set(bestHitPoint.x, bestHitPoint.y);
-            this.clawBody.setTranslation({ x: bestHitPoint.x, y: bestHitPoint.y }, true);
-            this.clawBody.setLinvel({ x: 0, y: 0 }, true);
-            this.clawBody.setAngvel(0, true);
-          }
-        }
-      }
-      
       // Auto-attach on collision with any fixed geometry
       const dirs = [{x:0,y:-0.7}, {x:0,y:0.7}, {x:-0.7,y:0}, {x:0.7,y:0}];
       let touched = false;

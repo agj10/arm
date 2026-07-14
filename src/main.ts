@@ -228,8 +228,8 @@ class Game {
     this.robotArm.update(this.mousePos, this.isMouseDown);
     this.levelManager.update(deltaTime);
     
-    // Update Cinematic Shaders
-    const sunWorldPos = new Vec2(this.cameraPos.x, this.cameraPos.y);
+    // Position the sun high in the sky (300 pixels above screen center)
+    const sunWorldPos = new Vec2(this.cameraPos.x, this.cameraPos.y + 7.5);
     this.lightingSystem.update(sunWorldPos);
 
     // Parallax Camera System
@@ -243,8 +243,8 @@ class Game {
     const cx = (window.innerWidth / 2) / stageScale;
     const cy = (window.innerHeight / 2) / stageScale;
 
-    // Fix Sun directly in the center of the screen
-    this.sunVisual.position.set(cx + this.cameraPos.x * ppm, cy + (-this.cameraPos.y * ppm));
+    // Fix Sun high in the sky (center X, top Y)
+    this.sunVisual.position.set(cx, cy - 300);
 
     this.gameplayLayer.x = cx - this.cameraPos.x * ppm;
     this.gameplayLayer.y = cy - (-this.cameraPos.y * ppm);
