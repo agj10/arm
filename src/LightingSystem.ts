@@ -65,9 +65,10 @@ export class LightingSystem {
         const hit = this.world.castRay(ray, this.maxDistance, false, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
         
         if (hit) {
+          const toi = (hit as any).toi ?? (hit as any).timeOfImpact ?? (hit as any).time_of_impact ?? this.maxDistance;
           const hitPoint = new Vec2(
-            ray.origin.x + ray.dir.x * hit.toi,
-            ray.origin.y + ray.dir.y * hit.toi
+            ray.origin.x + ray.dir.x * toi,
+            ray.origin.y + ray.dir.y * toi
           );
           points.push(hitPoint.x * 40, -hitPoint.y * 40);
         } else {
