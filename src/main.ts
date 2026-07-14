@@ -210,7 +210,8 @@ class Game {
     this.camera.lookAt(this.camera.position.x, this.camera.position.y, 0);
 
     // Render
-    this.composer.render();
+    // this.composer.render();
+    this.renderer.render(this.scene, this.camera);
   }
 }
 
