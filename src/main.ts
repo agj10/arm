@@ -61,7 +61,7 @@ class Game {
     await this.app.init({ 
       width: window.innerWidth, 
       height: window.innerHeight, 
-      backgroundColor: 0xff9955, // Sunset orange sky
+      backgroundColor: 0xaa5533, // Darker, moody sunset orange sky
       resizeTo: window,
       antialias: false
     });
@@ -71,16 +71,16 @@ class Game {
     container.appendChild(this.app.canvas);
 
     this.godrayFilter = new GodrayFilter({
-        alpha: 0.4,
+        alpha: 0.15, // Greatly reduced to prevent blinding
         angle: -30,
         parallel: true,
         time: 0
     });
 
     const adjustmentFilter = new AdjustmentFilter({
-        gamma: 1.1,
-        contrast: 1.3,
-        saturation: 1.2,
+        gamma: 1.0,
+        contrast: 1.1,
+        saturation: 1.1,
         brightness: 1.0
     });
 
@@ -88,10 +88,10 @@ class Game {
     this.app.stage.filters = [
       this.godrayFilter,
       new AdvancedBloomFilter({
-        threshold: 0.7,
-        bloomScale: 1.2,
+        threshold: 0.85, // Higher threshold so only very bright things bloom
+        bloomScale: 0.5, // Reduced intensity
         brightness: 1.0,
-        blur: 6,
+        blur: 4,
         quality: 4
       }),
       adjustmentFilter,
@@ -127,7 +127,7 @@ class Game {
     
     // Dark Ambient Shadow (Sunset Twilight)
     const shadowOverlay = new PIXI.Graphics();
-    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x4a2a4a, alpha: 0.75 }); // Purplish twilight
+    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x221133, alpha: 0.85 }); // Much darker twilight
     this.shadowLayer.addChild(shadowOverlay);
     this.shadowLayer.blendMode = 'multiply';
     this.postProcessLayer.addChild(this.shadowLayer);
