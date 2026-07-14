@@ -24,7 +24,7 @@ export class RobotArm {
   private rapier: typeof RAPIER;
   private world: RAPIER.World;
   
-  constructor(container: PIXI.Container, lightLayer: PIXI.Container, lightTex: PIXI.Texture, world: RAPIER.World, rapierModule: typeof RAPIER) {
+  constructor(container: PIXI.Container, world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
     this.world = world;
     this.clawPos = new Vec2(0, -5);

@@ -118,7 +118,7 @@ class Game {
     this.world = new this.rapier.World(gravity);
 
     // Create Robot Arm
-    this.robotArm = new RobotArm(this.gameplayLayer, this.lightLayer, lightTex, this.world, this.rapier);
+    this.robotArm = new RobotArm(this.gameplayLayer, this.world, this.rapier);
     
     // Level Manager
     this.levelManager = new LevelManager(this.uiManager, this.robotArm);
