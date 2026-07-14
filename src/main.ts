@@ -43,6 +43,7 @@ class Game {
   private mousePos = new Vec2();
   private cameraPos = new Vec2(0, 0);
   private godrayFilter!: GodrayFilter;
+  private leafOverlay!: PIXI.TilingSprite;
 
   constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
@@ -102,14 +103,14 @@ class Game {
 
     this.skyLayer = new PIXI.Container();
     
-    // Draw a sunset Sun in the sky
+    // Draw a sunset Sun in the sky, much lower on the horizon
     const sun = new PIXI.Graphics();
     sun.circle(0, 0, 100).fill({ color: 0xffeadd });
-    sun.position.set(window.innerWidth * 0.7, window.innerHeight * 0.4);
+    sun.position.set(window.innerWidth * 0.7, window.innerHeight * 0.7);
     
     // Add sun halo/glow
     const sunGlow = new PIXI.Graphics();
-    sunGlow.circle(0, 0, 300).fill({ color: 0xff8833, alpha: 0.3 });
+    sunGlow.circle(0, 0, 300).fill({ color: 0xffaa44, alpha: 0.35 });
     sun.addChild(sunGlow);
     
     this.skyLayer.addChild(sun);
@@ -128,6 +129,20 @@ class Game {
     const shadowOverlay = new PIXI.Graphics();
     shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x221133, alpha: 0.85 }); // Much darker twilight
     this.shadowLayer.addChild(shadowOverlay);
+    
+    // Leaf shadow overlay
+    PIXI.Assets.load('/leaf_shadows.png').then((texture) => {
+      this.leafOverlay = new PIXI.TilingSprite({
+        texture: texture,
+        width: window.innerWidth * 2,
+        height: window.innerHeight * 2
+      });
+      this.leafOverlay.blendMode = 'multiply';
+      this.leafOverlay.alpha = 0.5;
+      this.leafOverlay.position.set(-window.innerWidth/2, -window.innerHeight/2);
+      this.shadowLayer.addChild(this.leafOverlay);
+    });
+
     this.shadowLayer.blendMode = 'multiply';
     this.postProcessLayer.addChild(this.shadowLayer);
 
@@ -243,6 +258,20 @@ class Game {
     const targetCamY = this.robotArm.clawPos.y;
     this.cameraPos.x += (targetCamX - this.cameraPos.x) * 5 * deltaTime;
     this.cameraPos.y += (targetCamY - this.cameraPos.y) * 5 * deltaTime;
+
+    if (this.leafOverlay) {
+      // Move leaf shadows slowly for parallax
+      this.leafOverlay.tilePosition.x = -this.cameraPos.x * 5;
+      this.leafOverlay.tilePosition.y = this.cameraPos.y * 5;
+
+      // Fade out leaf shadows when going underground (Y < -15)
+      const depth = -this.cameraPos.y;
+      if (depth > 15) {
+        this.leafOverlay.alpha = Math.max(0, 0.5 - (depth - 15) * 0.05);
+      } else {
+        this.leafOverlay.alpha = 0.5;
+      }
+    }
 
     const ppm = 40;
     const cx = window.innerWidth / 2;

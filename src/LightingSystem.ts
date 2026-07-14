@@ -9,10 +9,10 @@ export class LightingSystem {
   public lightContainer: PIXI.Container;
   private lightGraphics: PIXI.Graphics;
 
-  private rayCount: number = 360; // Smooth polygons
+  private rayCount: number = 180; // Optimized for performance
   private maxDistance: number = 100; // In rapier units (meters)
-  private samples: number = 5; // Stepped banding
-  private lightRadius: number = 1.0; // Area light radius
+  private samples: number = 4; // Stepped banding
+  private lightRadius: number = 1.5; // Area light radius
 
   constructor(world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.world = world;
@@ -30,9 +30,9 @@ export class LightingSystem {
   public update(lightPos: Vec2) {
     this.lightGraphics.clear();
     
-    // Start with a very pale yellow-white, it will blend additively
-    const color = 0xffeebb; 
-    const alpha = 0.08; // Very subtle per step
+    // Warm sunset orange, bright center
+    const color = 0xffa050; 
+    const alpha = 0.15; // Stronger orange per step
 
     for (let s = 0; s < this.samples; s++) {
       const sampleAngle = (s / this.samples) * Math.PI * 2;

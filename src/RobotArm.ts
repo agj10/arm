@@ -21,6 +21,9 @@ export class RobotArm {
   private isAttached: boolean = true;
   private prevIsMouseDown: boolean = false;
 
+  private armBodies: RAPIER.RigidBody[] = [];
+  private jointBodies: RAPIER.RigidBody[] = [];
+
   private rapier: typeof RAPIER;
   private world: RAPIER.World;
   
@@ -58,6 +61,12 @@ export class RobotArm {
       container.addChild(arm);
       this.armMeshes.push(arm);
       this.joints.push(new Vec2());
+
+      const armBodyDesc = rapierModule.RigidBodyDesc.kinematicPositionBased();
+      const armBody = world.createRigidBody(armBodyDesc);
+      const armColDesc = rapierModule.ColliderDesc.cuboid(0.25, 0.5);
+      world.createCollider(armColDesc, armBody);
+      this.armBodies.push(armBody);
     }
     this.joints.push(new Vec2()); 
 
@@ -66,6 +75,12 @@ export class RobotArm {
       jMesh.circle(0, 0, 0.4 * 40).fill(0x8b5a2b);
       container.addChild(jMesh);
       this.jointMeshes.push(jMesh);
+
+      const jointBodyDesc = rapierModule.RigidBodyDesc.kinematicPositionBased();
+      const jointBody = world.createRigidBody(jointBodyDesc);
+      const jointColDesc = rapierModule.ColliderDesc.ball(0.4);
+      world.createCollider(jointColDesc, jointBody);
+      this.jointBodies.push(jointBody);
     }
 
 
@@ -198,12 +213,19 @@ export class RobotArm {
       const start = this.joints[i];
       const end = this.joints[i+1];
       
-      this.armMeshes[i].position.set(start.x * 40, -start.y * 40);
-      this.armMeshes[i].scale.set(1, L);
-      this.armMeshes[i].rotation = Math.atan2(-end.y - (-start.y), end.x - start.x) - Math.PI / 2;
+      const cx = (start.x + end.x) / 2;
+      const cy = (start.y + end.y) / 2;
       
+      this.armMeshes[i].position.set(start.x * 40, -start.y * 40);
+      const angle = Math.atan2(end.y - start.y, end.x - start.x);
+      this.armMeshes[i].rotation = angle - Math.PI / 2;
+      
+      this.armBodies[i].setTranslation({ x: cx, y: cy }, true);
+      this.armBodies[i].setRotation(angle - Math.PI / 2, true);
+
       if (i < 2) {
         this.jointMeshes[i].position.set(end.x * 40, -end.y * 40);
+        this.jointBodies[i].setTranslation({ x: end.x, y: end.y }, true);
       }
     }
   }
