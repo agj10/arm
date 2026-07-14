@@ -73,10 +73,10 @@ class Game {
     this.app.stage.scale.set(0.5); // Zoom out 2x to widen FOV
 
     this.godrayFilter = new GodrayFilter({
-      alpha: 0.7,
-      angle: 30,
-      gain: 0.5,
-      lacunarity: 2.5,
+      alpha: 0.25, // Subtle radial beams, not blinding
+      angle: 0,
+      gain: 0.35,
+      lacunarity: 2.0,
       time: 0
     });
     this.godrayFilter.parallel = false;
