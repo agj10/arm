@@ -18,9 +18,12 @@ export class RobotArm {
   private prevIsMouseDown: boolean = false;
   private prevBodyPos: THREE.Vector2 = new THREE.Vector2();
   private velocity: THREE.Vector2 = new THREE.Vector2();
+
+  private rapier: typeof RAPIER;
   
   constructor(scene: THREE.Scene, world: RAPIER.World, rapierModule: typeof RAPIER) {
-    this.clawPos = new THREE.Vector2(0, -4); // Start attached to floor
+    this.rapier = rapierModule;
+    this.clawPos = new THREE.Vector2(0, -5); // Start attached to floor top
 
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.7, side: THREE.DoubleSide });
     const armMat = new THREE.MeshStandardMaterial({ color: 0x5a5a5a, roughness: 0.6, side: THREE.DoubleSide });
@@ -56,7 +59,7 @@ export class RobotArm {
       this.jointMeshes.push(jMesh);
     }
 
-    const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, 0);
+    const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -1);
     this.rigidBody = world.createRigidBody(rigidBodyDesc);
     const colliderDesc = rapierModule.ColliderDesc.ball(0.8).setRestitution(0.2);
     world.createCollider(colliderDesc, this.rigidBody);
@@ -64,7 +67,7 @@ export class RobotArm {
 
   public update(mousePos: THREE.Vector2, isMouseDown: boolean) {
     if (this.isAttached) {
-      this.rigidBody.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
+      this.rigidBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
 
       // Body follows mouse symmetrically
       const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
@@ -88,7 +91,7 @@ export class RobotArm {
       // Swing Release
       if (this.prevIsMouseDown && !isMouseDown) {
         this.isAttached = false;
-        this.rigidBody.setBodyType(RAPIER.RigidBodyType.Dynamic, true);
+        this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
         // Throw!
         this.rigidBody.setLinvel({ x: this.velocity.x, y: this.velocity.y }, true);
       }
