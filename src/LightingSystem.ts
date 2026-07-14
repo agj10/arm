@@ -22,73 +22,63 @@ export class LightingSystem {
     
     // Create a smooth radial gradient texture
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
+    canvas.width = 2048;
+    canvas.height = 2048;
     const ctx = canvas.getContext('2d')!;
-    const grd = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
-    // Use full alpha here, we'll reduce alpha when drawing the polygon
-    grd.addColorStop(0, "rgba(255, 160, 80, 1.0)"); 
-    grd.addColorStop(1, "rgba(255, 160, 80, 0.0)"); 
+    const grd = ctx.createRadialGradient(1024, 1024, 0, 1024, 1024, 1024);
+    grd.addColorStop(0, "rgba(255, 160, 80, 0.15)"); // Low alpha because we layer 8 samples
+    grd.addColorStop(1, "rgba(255, 160, 80, 0.0)");
     ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, 512, 512);
+    ctx.fillRect(0, 0, 2048, 2048);
     
     this.lightTexture = PIXI.Texture.from(canvas);
     this.lightGraphics = new PIXI.Graphics();
-    
     this.lightContainer.addChild(this.lightGraphics); 
   }
 
   public update(lightPos: Vec2) {
-    const samples = 12;
-    const lightRadius = 0.15;
-    // Total desired alpha at center is ~0.35. We divide by samples.
-    const alpha = 0.35 / samples; 
-
     this.lightGraphics.clear();
+    
+    const samples = 8;
+    const lightRadius = 0.3; // Creates soft penumbra that blur over distance
+    
+    const matrix = new PIXI.Matrix();
+    matrix.translate(lightPos.x * 40 - 1024, -lightPos.y * 40 - 1024);
 
-    // Cast multiple offset rays to create soft penumbra shadows that fade with distance
     for (let s = 0; s < samples; s++) {
       const sampleAngle = (s / samples) * Math.PI * 2;
       const offsetX = Math.cos(sampleAngle) * lightRadius;
       const offsetY = Math.sin(sampleAngle) * lightRadius;
+
       const originX = lightPos.x + offsetX;
       const originY = lightPos.y + offsetY;
 
-      const points: number[] = [];
-      
+      const points: {x: number, y: number}[] = [];
+
       for (let i = 0; i < this.rayCount; i++) {
         const angle = (i / this.rayCount) * Math.PI * 2;
         const dir = { x: Math.cos(angle), y: Math.sin(angle) };
         const ray = new this.rapier.Ray({ x: originX, y: originY }, dir);
         
-        // EXCLUDE_DYNAMIC so the player doesn't cast a shadow
-        const hit = this.world.castRay(ray, this.maxDistance, false, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
-        
-        if (hit) {
-          const toi = (hit as any).toi ?? (hit as any).timeOfImpact ?? (hit as any).time_of_impact ?? this.maxDistance;
-          const hitPoint = new Vec2(
-            ray.origin.x + ray.dir.x * toi,
-            ray.origin.y + ray.dir.y * toi
-          );
-          points.push(hitPoint.x * 40, -hitPoint.y * 40);
+        // Exclude Dynamic/Kinematic so the robot doesn't cast shadows on itself!
+        const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
+        const hit = this.world.castRay(ray, this.maxDistance, false, filter);
+
+        let hitX, hitY;
+        if (hit && !isNaN((hit as any).toi)) {
+          const toi = (hit as any).toi;
+          hitX = originX + dir.x * toi;
+          hitY = originY + dir.y * toi;
         } else {
-          points.push(
-            (ray.origin.x + ray.dir.x * this.maxDistance) * 40,
-            -(ray.origin.y + ray.dir.y * this.maxDistance) * 40
-          );
+          hitX = originX + dir.x * this.maxDistance;
+          hitY = originY + dir.y * this.maxDistance;
         }
+
+        points.push({ x: hitX * 40, y: -hitY * 40 });
       }
-      
-      const matrix = new PIXI.Matrix();
-      matrix.translate(-256, -256); // Center the 512x512 texture
-      matrix.scale(3000 / 512, 3000 / 512); // Scale to 3000x3000
-      matrix.translate(originX * 40, -originY * 40); // Move to the ray origin
-      
-      this.lightGraphics.poly(points).fill({ 
-        texture: this.lightTexture,
-        matrix: matrix,
-        alpha: alpha
-      });
+
+      // Draw the polygon natively filled with the gradient texture
+      this.lightGraphics.poly(points).fill({ texture: this.lightTexture, matrix: matrix });
     }
   }
 }

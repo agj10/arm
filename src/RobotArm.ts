@@ -95,25 +95,24 @@ export class RobotArm {
       this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
       this.clawBody.setTranslation({ x: this.clawPos.x, y: this.clawPos.y }, true);
 
-      // Base ALWAYS follows the mouse for aiming/dragging, regardless of click
+      // Always track mouse directly so player can aim slingshot
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
       
-      let clampedMousePos = mousePos.clone();
-      if (clampedMousePos.distanceTo(this.clawPos) > maxDist) {
-        const dir = clampedMousePos.clone().sub(this.clawPos).normalize();
-        clampedMousePos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
+      let targetPos = mousePos.clone();
+      if (targetPos.distanceTo(this.clawPos) > maxDist) {
+        const dir = targetPos.clone().sub(this.clawPos).normalize();
+        targetPos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
       }
-      this.rigidBody.setTranslation({ x: clampedMousePos.x, y: clampedMousePos.y }, true);
+      this.rigidBody.setTranslation({ x: targetPos.x, y: targetPos.y }, true);
 
       if (this.prevIsMouseDown && !isMouseDown) {
-        // Shoot! (Release click)
+        // Released! Shoot!
         this.isAttached = false;
+        this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
         this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
         
-        // Massive velocity to BOTH base and claw!
-        const basePos = this.rigidBody.translation();
-        const pullX = this.clawPos.x - basePos.x;
-        const pullY = this.clawPos.y - basePos.y;
+        const pullX = this.clawPos.x - targetPos.x;
+        const pullY = this.clawPos.y - targetPos.y;
         
         this.rigidBody.setLinvel({ x: pullX * 12, y: pullY * 12 }, true);
         this.clawBody.setLinvel({ x: pullX * 12, y: pullY * 12 }, true);
@@ -124,23 +123,27 @@ export class RobotArm {
       const cPos = this.clawBody.translation();
       this.clawPos.set(cPos.x, cPos.y);
 
-      // Auto-attach on collision with any fixed geometry
+      // Auto-attach on collision with any fixed geometry, snapping exactly to surface
       const dirs = [{x:0,y:-0.7}, {x:0,y:0.7}, {x:-0.7,y:0}, {x:0.7,y:0}];
-      let touched = false;
+      let attachedPoint = null;
       for (const d of dirs) {
         const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, d);
-        // Reduced ray distance to 0.61 (claw is 0.6 size) to ensure it attaches flush with surface
-        const hit = this.world.castRay(ray, 0.61, true, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
-        if (hit) {
-          touched = true;
+        // Exclude dynamic/kinematic so it only attaches to fixed level geometry
+        const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
+        const hit = this.world.castRay(ray, 0.7, true, filter);
+        if (hit && !isNaN((hit as any).toi)) {
+          attachedPoint = new Vec2(
+            ray.origin.x + ray.dir.x * (hit as any).toi,
+            ray.origin.y + ray.dir.y * (hit as any).toi
+          );
           break;
         }
       }
 
-      if (touched) { 
+      if (attachedPoint) { 
         this.isAttached = true;
-        this.clawPos.set(cPos.x, cPos.y); 
-        this.clawBody.setTranslation({ x: cPos.x, y: cPos.y }, true);
+        this.clawPos.set(attachedPoint.x, attachedPoint.y); 
+        this.clawBody.setTranslation({ x: attachedPoint.x, y: attachedPoint.y }, true);
         this.clawBody.setLinvel({ x: 0, y: 0 }, true);
         this.clawBody.setAngvel(0, true);
       } else if (bodyPos.y <= -1499.1 && bodyPos.x >= 150) { 
