@@ -125,7 +125,7 @@ export class RobotArm {
         // Natural swing: apply a continuous pulling force toward the opposite side of mouse drag
         const pullX = this.clawPos.x - mousePos.x;
         const pullY = this.clawPos.y - mousePos.y;
-        this.rigidBody.applyForce({ x: pullX * 40, y: pullY * 40 }, true);
+        this.rigidBody.addForce({ x: pullX * 40, y: pullY * 40 }, true);
       }
 
       if (this.prevIsMouseDown && !isMouseDown) {
