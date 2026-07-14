@@ -17,7 +17,7 @@ export class LevelManager {
     const py = this.robotArm.clawPos.y;
 
     if (!this.initDone) {
-      this.uiManager.showAreaTitle('Sector 00');
+      this.uiManager.showAreaTitle('외진 숲');
       this.initDone = true;
     }
 
@@ -25,8 +25,8 @@ export class LevelManager {
       case 'FOREST':
         if (px > 120) { 
           this.state = 'FACTORY_ENTRANCE';
-          this.uiManager.showAreaTitle('Sector 01');
-          this.uiManager.showSubtitle('SYSTEM ONLINE', true);
+          this.uiManager.showAreaTitle('무너진 공장');
+          this.uiManager.showSubtitle('오래된 컨베이어 벨트가 아직 돌아가고 있다.', true);
         }
         break;
       
@@ -34,7 +34,7 @@ export class LevelManager {
         if (py < -20) { 
           this.state = 'DROP';
           this.uiManager.clearSubtitle();
-          this.uiManager.showSubtitle('CRITICAL ERROR', false);
+          this.uiManager.showSubtitle('철컥.', false);
         }
         break;
         

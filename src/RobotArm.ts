@@ -64,7 +64,7 @@ export class RobotArm {
 
       const armBodyDesc = rapierModule.RigidBodyDesc.kinematicPositionBased();
       const armBody = world.createRigidBody(armBodyDesc);
-      const armColDesc = rapierModule.ColliderDesc.cuboid(0.25, 1.25);
+      const armColDesc = rapierModule.ColliderDesc.cuboid(0.25, 1.25).setSensor(true);
       world.createCollider(armColDesc, armBody);
       this.armBodies.push(armBody);
     }
@@ -78,7 +78,7 @@ export class RobotArm {
 
       const jointBodyDesc = rapierModule.RigidBodyDesc.kinematicPositionBased();
       const jointBody = world.createRigidBody(jointBodyDesc);
-      const jointColDesc = rapierModule.ColliderDesc.ball(0.4);
+      const jointColDesc = rapierModule.ColliderDesc.ball(0.4).setSensor(true);
       world.createCollider(jointColDesc, jointBody);
       this.jointBodies.push(jointBody);
     }
