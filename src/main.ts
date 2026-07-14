@@ -33,15 +33,16 @@ class Game {
   private robotArm!: RobotArm;
   private uiManager: UIManager;
   private levelManager!: LevelManager;
-  private clock: THREE.Clock;
 
-  private mousePos = new THREE.Vector2(0, 0);
+  // Input & State
   private isMouseDown = false;
+  private mouse = new THREE.Vector2();
+  private mousePos = new THREE.Vector2();
+  private lastTime = 0;
 
   constructor(rapierModule: any) {
     this.rapier = rapierModule;
     const container = document.getElementById('game-container')!;
-    this.clock = new THREE.Clock();
     this.uiManager = new UIManager();
     
     // Scene setup
@@ -146,8 +147,9 @@ class Game {
     this.createTestScene();
 
     // Event Listeners
-    window.addEventListener('resize', this.onWindowResize.bind(this), false);
+    window.addEventListener('resize', this.onWindowResize.bind(this));
     
+    // Mouse events
     window.addEventListener('mousemove', (e) => {
       const vec = new THREE.Vector3(
         (e.clientX / window.innerWidth) * 2 - 1,
@@ -160,36 +162,35 @@ class Game {
       const pos = this.camera.position.clone().add(dir.multiplyScalar(distance));
       this.mousePos.set(pos.x, pos.y);
     });
+    window.addEventListener('mousedown', () => this.isMouseDown = true);
+    window.addEventListener('mouseup', () => this.isMouseDown = false);
 
-    window.addEventListener('mousedown', () => { this.isMouseDown = true; });
-    window.addEventListener('mouseup', () => { this.isMouseDown = false; });
-
-    // Start loop
     this.animate();
   }
 
   private createTestScene() {
-    // Static Floor & Platforms
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+    // Static Floor & Platforms - 2D Planes
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x557755, roughness: 1.0 }); 
     
     // Main long floor
-    const floorGeo = new THREE.BoxGeometry(200, 2, 10);
+    const floorGeo = new THREE.PlaneGeometry(200, 20);
     const floorMesh = new THREE.Mesh(floorGeo, floorMat);
-    floorMesh.position.set(50, 0, 0); // Raised floor to y=0, claw is at y=5, arm is 4.5 long so it reaches!
+    floorMesh.position.set(50, -15, 0); // Center at -15. Top is at -5.
     floorMesh.receiveShadow = true;
     this.scene.add(floorMesh);
 
-    const floorBodyDesc = this.rapier.RigidBodyDesc.fixed().setTranslation(50, 0);
+    const floorBodyDesc = this.rapier.RigidBodyDesc.fixed().setTranslation(50, -15);
     const floorBody = this.world.createRigidBody(floorBodyDesc);
-    const floorColliderDesc = this.rapier.ColliderDesc.cuboid(100, 1);
+    const floorColliderDesc = this.rapier.ColliderDesc.cuboid(100, 10);
     this.world.createCollider(floorColliderDesc, floorBody);
 
     // Some extra blocks to swing on
+    const blockMat = new THREE.MeshStandardMaterial({ color: 0x665544, roughness: 0.9 });
     for (let i = 0; i < 5; i++) {
-      const blockGeo = new THREE.BoxGeometry(4, 4, 4);
-      const blockMesh = new THREE.Mesh(blockGeo, floorMat);
+      const blockGeo = new THREE.PlaneGeometry(4, 4);
+      const blockMesh = new THREE.Mesh(blockGeo, blockMat);
       const bx = 10 + i * 20;
-      const by = 4 + (i % 2) * 3;
+      const by = 4 + (i % 2) * 5;
       blockMesh.position.set(bx, by, 0);
       blockMesh.receiveShadow = true;
       this.scene.add(blockMesh);
@@ -199,36 +200,56 @@ class Game {
       const blockColliderDesc = this.rapier.ColliderDesc.cuboid(2, 2);
       this.world.createCollider(blockColliderDesc, blockBody);
     }
+    
+    // Background parallax layers
+    const bgMat1 = new THREE.MeshBasicMaterial({ color: 0x334433 });
+    const bg1 = new THREE.Mesh(new THREE.PlaneGeometry(300, 50), bgMat1);
+    bg1.position.set(50, 10, -10);
+    this.scene.add(bg1);
+
+    const bgMat2 = new THREE.MeshBasicMaterial({ color: 0x112211 });
+    const bg2 = new THREE.Mesh(new THREE.PlaneGeometry(300, 80), bgMat2);
+    bg2.position.set(50, 20, -20);
+    this.scene.add(bg2);
   }
 
   private onWindowResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.composer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  private animate() {
+  private updateMouseWorldPos() {
+    const vec = new THREE.Vector3(this.mouse.x, this.mouse.y, 0.5);
+    vec.unproject(this.camera);
+    const dir = vec.sub(this.camera.position).normalize();
+    const distance = -this.camera.position.z / dir.z;
+    const pos = this.camera.position.clone().add(dir.multiplyScalar(distance));
+    this.mousePos.set(pos.x, pos.y);
+  }
+
+  private animate(time: number = 0) {
     requestAnimationFrame(this.animate.bind(this));
     
-    const deltaTime = this.clock.getDelta();
-    
-    // Step Physics
+    this.updateMouseWorldPos(); // Always keep world mouse pos updated
+
+    const deltaTime = Math.min((time - this.lastTime) / 1000, 0.1);
+    this.lastTime = time;
+
+    // Physics step
     this.world.step();
 
-    // Update Game Logic
+    // Logic update
     this.robotArm.update(this.mousePos, this.isMouseDown);
     this.levelManager.update(deltaTime);
 
-    // Camera follow logic (Lerp towards claw)
+    // Camera follow
     const clawPos = this.robotArm.clawPos;
     this.camera.position.x += (clawPos.x - this.camera.position.x) * 0.1;
     this.camera.position.y += (clawPos.y - this.camera.position.y) * 0.1;
-    // Look at player
     this.camera.lookAt(this.camera.position.x, this.camera.position.y, 0);
 
     // Render
-    // this.composer.render();
     this.renderer.render(this.scene, this.camera);
   }
 }
