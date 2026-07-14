@@ -4,6 +4,8 @@ import { Vec2 } from './Vec2';
 
 export class LightingSystem {
   private world: RAPIER.World;
+  private rapier: typeof RAPIER;
+  
   public lightContainer: PIXI.Container;
   private lightMeshes: PIXI.Mesh[] = [];
   private lightGeometries: PIXI.Geometry[] = [];
@@ -45,10 +47,10 @@ export class LightingSystem {
       const vertices = new Float32Array((this.rayCount + 1) * 2);
       const uvs = new Float32Array((this.rayCount + 1) * 2);
       
-      const geometry = new PIXI.Geometry()
-        .addAttribute('aPosition', vertices, 2)
-        .addAttribute('aUV', uvs, 2)
-        .addIndex(indices);
+      const geometry = new PIXI.Geometry();
+      geometry.addAttribute('aPosition', vertices, 2);
+      geometry.addAttribute('aUV', uvs, 2);
+      geometry.addIndex(indices);
         
       const mesh = new PIXI.Mesh({ geometry, texture: this.lightTexture });
       
