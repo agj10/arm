@@ -136,7 +136,7 @@ export class RobotArm {
         const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, d);
         // Exclude dynamic/kinematic so it only attaches to fixed level geometry
         const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
-        const hit = this.world.castRay(ray, 0.7, true, filter);
+        const hit = this.world.castRay(ray, 0.7, true, 0xffffffff, filter);
         if (hit && !isNaN((hit as any).toi)) {
           attachedPoint = new Vec2(
             ray.origin.x + ray.dir.x * (hit as any).toi,
