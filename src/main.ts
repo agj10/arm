@@ -169,18 +169,36 @@ class Game {
   }
 
   private createTestScene() {
-    // Floor
-    const floorGeo = new THREE.PlaneGeometry(200, 100);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x223322 }); // Forest tint
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.position.y = -10;
-    floor.position.z = -10; // pushed back for parallax
-    floor.receiveShadow = true;
-    this.scene.add(floor);
+    // Static Floor & Platforms
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+    
+    // Main long floor
+    const floorGeo = new THREE.BoxGeometry(200, 2, 10);
+    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+    floorMesh.position.set(50, 0, 0); // Raised floor to y=0, claw is at y=5, arm is 4.5 long so it reaches!
+    floorMesh.receiveShadow = true;
+    this.scene.add(floorMesh);
 
-    // Physics floor for collisions
-    const groundColliderDesc = this.rapier.ColliderDesc.cuboid(100.0, 1.0).setTranslation(0, -10);
-    this.world.createCollider(groundColliderDesc);
+    const floorBodyDesc = this.rapier.RigidBodyDesc.fixed().setTranslation(50, 0);
+    const floorBody = this.world.createRigidBody(floorBodyDesc);
+    const floorColliderDesc = this.rapier.ColliderDesc.cuboid(100, 1);
+    this.world.createCollider(floorColliderDesc, floorBody);
+
+    // Some extra blocks to swing on
+    for (let i = 0; i < 5; i++) {
+      const blockGeo = new THREE.BoxGeometry(4, 4, 4);
+      const blockMesh = new THREE.Mesh(blockGeo, floorMat);
+      const bx = 10 + i * 20;
+      const by = 4 + (i % 2) * 3;
+      blockMesh.position.set(bx, by, 0);
+      blockMesh.receiveShadow = true;
+      this.scene.add(blockMesh);
+
+      const blockBodyDesc = this.rapier.RigidBodyDesc.fixed().setTranslation(bx, by);
+      const blockBody = this.world.createRigidBody(blockBodyDesc);
+      const blockColliderDesc = this.rapier.ColliderDesc.cuboid(2, 2);
+      this.world.createCollider(blockColliderDesc, blockBody);
+    }
   }
 
   private onWindowResize() {

@@ -4,23 +4,23 @@ import type RAPIER from '@dimforge/rapier2d';
 export class RobotArm {
   public bodyMesh: THREE.Mesh;
   public clawMesh: THREE.Mesh;
-  private armMesh1: THREE.Mesh;
-  private armMesh2: THREE.Mesh;
-  private jointMesh: THREE.Mesh;
+  
+  private armMeshes: THREE.Mesh[] = [];
+  private jointMeshes: THREE.Mesh[] = [];
+  
+  private joints: THREE.Vector2[] = [];
+  private armLengths: number[] = [1.5, 1.5, 1.5]; // 3 segments
 
   public clawPos: THREE.Vector2;
   private rigidBody: RAPIER.RigidBody;
   
-  private armLength1 = 2.0;
-  private armLength2 = 2.0;
-
   constructor(scene: THREE.Scene, world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.clawPos = new THREE.Vector2(0, 5); 
 
     // Rusted Metal Material
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.7, metalness: 0.8 });
     const armMat = new THREE.MeshStandardMaterial({ color: 0x5a5a5a, roughness: 0.6, metalness: 0.9 });
-    const rustMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9, metalness: 0.3 }); // Rust color for joints
+    const rustMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9, metalness: 0.3 });
 
     // Body
     this.bodyMesh = new THREE.Mesh(new THREE.SphereGeometry(0.8, 32, 32), bodyMat);
@@ -32,20 +32,24 @@ export class RobotArm {
     this.clawMesh.castShadow = true;
     scene.add(this.clawMesh);
 
-    // Arms
-    const cylGeo = new THREE.CylinderGeometry(0.2, 0.2, 1, 16);
-    cylGeo.translate(0, 0.5, 0); // Pivot at bottom
+    // Arms and Joints
+    for (let i = 0; i < 3; i++) {
+      const cylGeo = new THREE.CylinderGeometry(0.2, 0.2, 1, 16);
+      cylGeo.translate(0, 0.5, 0); // Pivot at bottom
+      const mesh = new THREE.Mesh(cylGeo, armMat);
+      mesh.castShadow = true;
+      scene.add(mesh);
+      this.armMeshes.push(mesh);
+      this.joints.push(new THREE.Vector2());
+    }
+    this.joints.push(new THREE.Vector2()); // 4 joints total (base, joint1, joint2, claw)
 
-    this.armMesh1 = new THREE.Mesh(cylGeo, armMat);
-    this.armMesh1.castShadow = true;
-    scene.add(this.armMesh1);
-
-    this.armMesh2 = new THREE.Mesh(cylGeo, armMat);
-    this.armMesh2.castShadow = true;
-    scene.add(this.armMesh2);
-
-    this.jointMesh = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), rustMat);
-    scene.add(this.jointMesh);
+    // 2 visible joints between the 3 arms
+    for (let i = 0; i < 2; i++) {
+      const jMesh = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), rustMat);
+      scene.add(jMesh);
+      this.jointMeshes.push(jMesh);
+    }
 
     // Physics Body
     const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, 0);
@@ -56,75 +60,75 @@ export class RobotArm {
 
   public update(mousePos: THREE.Vector2, isMouseDown: boolean) {
     if (isMouseDown) {
-      // Placeholder: Drag the claw towards mouse to allow player movement right/left
+      // Allows moving the claw when clicked
       this.clawPos.x += (mousePos.x - this.clawPos.x) * 0.1;
       this.clawPos.y += (mousePos.y - this.clawPos.y) * 0.1;
     }
+
+    const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
+    let clampedMousePos = mousePos.clone();
+    
+    // Clamp mouse distance to max arm length
+    if (clampedMousePos.distanceTo(this.clawPos) > maxDist) {
+      const dir = clampedMousePos.clone().sub(this.clawPos).normalize();
+      clampedMousePos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
+    }
+
     // 1. Calculate Target Position (Point Symmetric to Claw)
-    const targetX = this.clawPos.x - (mousePos.x - this.clawPos.x);
-    const targetY = this.clawPos.y - (mousePos.y - this.clawPos.y);
+    const targetX = this.clawPos.x - (clampedMousePos.x - this.clawPos.x);
+    const targetY = this.clawPos.y - (clampedMousePos.y - this.clawPos.y);
 
-    const currentPos = this.rigidBody.translation();
+    // Instant Teleportation
+    this.rigidBody.setTranslation({ x: targetX, y: targetY }, true);
+    this.rigidBody.setLinvel({ x: 0, y: 0 }, true); // Stop momentum
     
-    // Apply spring force towards target
-    const forceX = (targetX - currentPos.x) * 20.0;
-    const forceY = (targetY - currentPos.y) * 20.0;
-    
-    this.rigidBody.wakeUp();
-
-    // Damping
-    const currentVel = this.rigidBody.linvel();
-    this.rigidBody.setLinvel({ x: currentVel.x * 0.9, y: currentVel.y * 0.9 }, true);
-    
-    // Impulse
-    this.rigidBody.applyImpulse({ x: forceX * 0.02, y: forceY * 0.02 }, true);
-
     // Sync mesh
-    this.bodyMesh.position.set(currentPos.x, currentPos.y, 0);
+    this.bodyMesh.position.set(targetX, targetY, 0);
     this.clawMesh.position.set(this.clawPos.x, this.clawPos.y, 0);
 
     this.updateIK();
   }
 
   private updateIK() {
-    // 2-Bone IK
     const base = new THREE.Vector2(this.bodyMesh.position.x, this.bodyMesh.position.y);
     const target = this.clawPos.clone();
     
-    const dist = base.distanceTo(target);
-    const maxDist = this.armLength1 + this.armLength2;
-    
-    // If target is too far, stretch out completely
-    let p1 = new THREE.Vector2();
-    if (dist >= maxDist) {
-      const dir = target.clone().sub(base).normalize();
-      p1 = base.clone().add(dir.multiplyScalar(this.armLength1));
-    } else {
-      // Calculate elbow position
-      const a = this.armLength1;
-      const b = this.armLength2;
-      const c = dist;
+    // Initial setup if distance is large
+    this.joints[0].copy(base);
+    for(let i=1; i<4; i++) {
+        // Just distribute them linearly to give FABRIK a good starting point
+        this.joints[i].lerpVectors(base, target, i / 3);
+    }
+
+    // FABRIK Algorithm
+    for (let iter = 0; iter < 10; iter++) {
+      // Backward pass
+      this.joints[3].copy(target);
+      for (let i = 2; i >= 0; i--) {
+        const dir = this.joints[i].clone().sub(this.joints[i+1]).normalize();
+        this.joints[i].copy(this.joints[i+1].clone().add(dir.multiplyScalar(this.armLengths[i])));
+      }
       
-      // Law of cosines
-      const angle1 = Math.acos((a*a + c*c - b*b) / (2 * a * c));
-      const baseToTargetAngle = Math.atan2(target.y - base.y, target.x - base.x);
-      
-      const elbowAngle = baseToTargetAngle - angle1; // or + angle1 for other bending direction
-      p1.x = base.x + Math.cos(elbowAngle) * a;
-      p1.y = base.y + Math.sin(elbowAngle) * a;
+      // Forward pass
+      this.joints[0].copy(base);
+      for (let i = 1; i <= 3; i++) {
+        const dir = this.joints[i].clone().sub(this.joints[i-1]).normalize();
+        this.joints[i].copy(this.joints[i-1].clone().add(dir.multiplyScalar(this.armLengths[i-1])));
+      }
     }
 
     // Update visuals
-    this.jointMesh.position.set(p1.x, p1.y, 0);
-
-    // Arm 1 (Body to Elbow)
-    this.armMesh1.position.set(base.x, base.y, 0);
-    this.armMesh1.scale.y = this.armLength1;
-    this.armMesh1.rotation.z = Math.atan2(p1.y - base.y, p1.x - base.x) - Math.PI / 2;
-
-    // Arm 2 (Elbow to Claw)
-    this.armMesh2.position.set(p1.x, p1.y, 0);
-    this.armMesh2.scale.y = base.distanceTo(target) > maxDist ? dist - this.armLength1 : this.armLength2;
-    this.armMesh2.rotation.z = Math.atan2(target.y - p1.y, target.x - p1.x) - Math.PI / 2;
+    for (let i = 0; i < 3; i++) {
+      const start = this.joints[i];
+      const end = this.joints[i+1];
+      
+      this.armMeshes[i].position.set(start.x, start.y, 0);
+      this.armMeshes[i].scale.y = this.armLengths[i];
+      this.armMeshes[i].rotation.z = Math.atan2(end.y - start.y, end.x - start.x) - Math.PI / 2;
+      
+      if (i < 2) {
+        this.jointMeshes[i].position.set(end.x, end.y, 0);
+      }
+    }
   }
 }
