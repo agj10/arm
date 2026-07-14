@@ -6,7 +6,7 @@ import { LevelManager } from './LevelManager';
 import { LightingSystem } from './LightingSystem';
 import { Vec2 } from './Vec2';
 import * as RAPIER from '@dimforge/rapier2d';
-import { AdvancedBloomFilter, GodrayFilter, AdjustmentFilter } from 'pixi-filters';
+import { AdvancedBloomFilter, AdjustmentFilter } from 'pixi-filters';
 
 // Fetch and display version
 fetch('/version.json')
