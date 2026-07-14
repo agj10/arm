@@ -24,7 +24,7 @@ export class LightingSystem {
     // Force container to render offscreen and pixelate the entire lighting pass
     this.lightContainer.filters = [
       new PIXI.AlphaFilter({ alpha: 1.0 }),
-      new PixelateFilter([4, 4])
+      new PixelateFilter([3, 3])
     ];
     this.lightContainer.blendMode = 'add';
     
@@ -42,7 +42,8 @@ export class LightingSystem {
       });
       // Multiply blend mode cuts out the light where leaves are black
       this.leafOverlay.blendMode = 'multiply';
-      this.leafOverlay.tileScale.set(0.35); 
+      // Scale UP significantly so it looks like large leaves instead of high-frequency noise static
+      this.leafOverlay.tileScale.set(1.5); 
       this.leafOverlay.position.set(-2000, -2000);
       this.lightContainer.addChild(this.leafOverlay);
     });
