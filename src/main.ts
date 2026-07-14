@@ -1,13 +1,10 @@
 import './style.css';
-import * as THREE from 'three';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-
-import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
+import * as PIXI from 'pixi.js';
 import { RobotArm } from './RobotArm';
 import { UIManager } from './UIManager';
 import { LevelManager } from './LevelManager';
+import { Vec2 } from './Vec2';
+import * as RAPIER from '@dimforge/rapier2d';
 
 // Fetch and display version
 fetch('/version.json')
@@ -21,248 +18,196 @@ fetch('/version.json')
   .catch(e => console.error('Failed to load version.json', e));
 
 class Game {
-  private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
-  private renderer: THREE.WebGLRenderer;
-  private composer: EffectComposer;
+  private app!: PIXI.Application;
   
-  private world: any; // RAPIER.World
-  private rapier: any;
+  private world!: RAPIER.World;
+  private rapier!: typeof RAPIER;
   private robotArm!: RobotArm;
-  private uiManager: UIManager;
+  private uiManager!: UIManager;
   private levelManager!: LevelManager;
-  private dirLight!: THREE.DirectionalLight;
+
+  // Parallax Layers
+  private skyLayer!: PIXI.Container;
+  private bgLayerFar!: PIXI.Container;
+  private bgLayerMid!: PIXI.Container;
+  private gameplayLayer!: PIXI.Container;
+  private shadowLayer!: PIXI.Container;
+  private postProcessLayer!: PIXI.Container;
 
   // Input & State
   private isMouseDown = false;
-  private hasMouseMoved = false;
-  private mouse = new THREE.Vector2();
-  private mousePos = new THREE.Vector2();
-  private lastTime = 0;
+  private mousePos = new Vec2();
+  private cameraPos = new Vec2(0, 0);
 
-  constructor(rapierModule: any) {
+  constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
-    const container = document.getElementById('game-container')!;
+    this.init();
+  }
+
+  private async init() {
     this.uiManager = new UIManager();
     
-    // Scene setup
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xdfefff); // Light sky blue
-    this.scene.fog = new THREE.FogExp2(0xdfefff, 0.005);
-
-    // Camera setup (2.5D perspective)
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.camera.position.z = 45;
-
-    // Renderer
-    this.renderer = new THREE.WebGLRenderer({ antialias: false });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    container.appendChild(this.renderer.domElement);
-
-    // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Slightly lowered to let shadows pop
-    this.scene.add(ambientLight);
-
-    this.dirLight = new THREE.DirectionalLight(0xffffff, 3.5);
-    this.dirLight.position.set(10, 30, 20);
-    this.dirLight.castShadow = true;
-    this.dirLight.shadow.camera.top = 100;
-    this.dirLight.shadow.camera.bottom = -100;
-    this.dirLight.shadow.camera.left = -100;
-    this.dirLight.shadow.camera.right = 100;
-    this.dirLight.shadow.mapSize.width = 2048;
-    this.dirLight.shadow.mapSize.height = 2048;
-    this.scene.add(this.dirLight);
-    this.scene.add(this.dirLight.target);
-
-    // Post Processing
-    this.composer = new EffectComposer(this.renderer);
-    
-    const renderPass = new RenderPass(this.scene, this.camera);
-    this.composer.addPass(renderPass);
-
-    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-    bloomPass.threshold = 0.6;
-    bloomPass.strength = 0.5;
-    bloomPass.radius = 0.5;
-    this.composer.addPass(bloomPass);
-
-    const bokehPass = new BokehPass(this.scene, this.camera, {
-      focus: 45.0,
-      aperture: 0.0001,
-      maxblur: 0.01
+    this.app = new PIXI.Application();
+    await this.app.init({ 
+      width: window.innerWidth, 
+      height: window.innerHeight, 
+      backgroundColor: 0xdfefff, // Sky blue
+      resizeTo: window,
+      antialias: false
     });
-    this.composer.addPass(bokehPass);
+    
+    const container = document.getElementById('game-container')!;
+    container.innerHTML = ''; // Clear Three.js canvas if any
+    container.appendChild(this.app.canvas);
+
+    this.postProcessLayer = new PIXI.Container();
+    this.app.stage.addChild(this.postProcessLayer);
+
+    this.skyLayer = new PIXI.Container();
+    this.bgLayerFar = new PIXI.Container();
+    this.bgLayerMid = new PIXI.Container();
+    this.gameplayLayer = new PIXI.Container();
+    this.shadowLayer = new PIXI.Container();
+
+    this.postProcessLayer.addChild(this.skyLayer);
+    this.postProcessLayer.addChild(this.bgLayerFar);
+    this.postProcessLayer.addChild(this.bgLayerMid);
+    this.postProcessLayer.addChild(this.gameplayLayer);
+    this.postProcessLayer.addChild(this.shadowLayer);
+
+    // Dappled Shadow Setup (Multiply Blend Mode)
+    const shadowOverlay = new PIXI.Graphics();
+    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x223355, alpha: 0.8 });
+    this.shadowLayer.addChild(shadowOverlay);
+    this.shadowLayer.blendMode = 'multiply';
+
+    // Punch holes in the shadow (Erase Blend Mode)
+    for(let i=0; i<300; i++) {
+        const hole = new PIXI.Graphics();
+        hole.circle(Math.random() * 8000 - 1000, Math.random() * 1000 - 500, Math.random() * 60 + 20).fill({color: 0xffffff, alpha: 1.0});
+        hole.blendMode = 'erase';
+        this.shadowLayer.addChild(hole);
+    }
 
     // Physics World
-    const gravity = { x: 0.0, y: -30.0 }; // Increased gravity
+    const gravity = { x: 0.0, y: -30.0 };
     this.world = new this.rapier.World(gravity);
 
     // Create Robot Arm
-    this.robotArm = new RobotArm(this.scene, this.world, this.rapier);
+    this.robotArm = new RobotArm(this.gameplayLayer, this.world, this.rapier);
     
     // Level Manager
     this.levelManager = new LevelManager(this.uiManager, this.robotArm);
 
-    // Placeholder level design
     this.createTestScene();
 
-    // Event Listeners
-    window.addEventListener('resize', this.onWindowResize.bind(this));
-    
-    // Mouse events
+    // Input events
     window.addEventListener('mousemove', (e) => {
-      this.hasMouseMoved = true;
-      this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const worldX = (e.clientX - cx) / 40 + this.cameraPos.x;
+      const worldY = -(e.clientY - cy) / 40 + this.cameraPos.y; 
+      
+      this.mousePos.x = worldX;
+      this.mousePos.y = worldY;
     });
     window.addEventListener('mousedown', () => this.isMouseDown = true);
     window.addEventListener('mouseup', () => this.isMouseDown = false);
-    window.addEventListener('wheel', (e) => {
-      this.camera.position.z += Math.sign(e.deltaY) * 2.0;
-      this.camera.position.z = Math.max(15, Math.min(this.camera.position.z, 60));
-    });
 
-    this.animate();
+    this.app.ticker.add((ticker) => {
+      this.animate(ticker.deltaMS);
+    });
   }
 
   private createTestScene() {
-    // Static Floor & Platforms - 2D Planes
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x557755, roughness: 1.0 }); 
-    
-    // Forest Floor (x: -50 to 150)
-    const floorGeo1 = new THREE.PlaneGeometry(200, 20);
-    const floorMesh1 = new THREE.Mesh(floorGeo1, floorMat);
-    floorMesh1.position.set(50, -15, 0); // Center at 50, top at -5
-    floorMesh1.receiveShadow = true;
-    this.scene.add(floorMesh1);
-
+    // 1. Forest Floor
     const floorBodyDesc1 = this.rapier.RigidBodyDesc.fixed().setTranslation(50, -15);
     const floorBody1 = this.world.createRigidBody(floorBodyDesc1);
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(100, 10), floorBody1);
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(50, 5), floorBody1);
+    
+    const f1Vis = new PIXI.Graphics();
+    f1Vis.rect(-50 * 40, -5 * 40, 100 * 40, 10 * 40).fill(0x557755);
+    f1Vis.position.set(50 * 40, 15 * 40);
+    this.gameplayLayer.addChild(f1Vis);
 
-    // Underground Factory Floor (x: 150 to 950)
-    const factoryMat = new THREE.MeshStandardMaterial({ color: 0x444455, roughness: 0.8 });
-    const floorGeo2 = new THREE.PlaneGeometry(800, 20);
-    const floorMesh2 = new THREE.Mesh(floorGeo2, factoryMat);
-    floorMesh2.position.set(550, -1510, 0); // Drop down 1500 units, top at -1500
-    floorMesh2.receiveShadow = true;
-    this.scene.add(floorMesh2);
-
+    // 2. Factory Floor
+    const factoryMat = 0x444455;
     const floorBodyDesc2 = this.rapier.RigidBodyDesc.fixed().setTranslation(550, -1510);
     const floorBody2 = this.world.createRigidBody(floorBodyDesc2);
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(400, 10), floorBody2);
+    
+    const f2Vis = new PIXI.Graphics();
+    f2Vis.rect(-400 * 40, -10 * 40, 800 * 40, 20 * 40).fill(factoryMat);
+    f2Vis.position.set(550 * 40, 1510 * 40);
+    this.gameplayLayer.addChild(f2Vis);
 
-    // Some extra blocks to swing on
-    const blockMat = new THREE.MeshStandardMaterial({ color: 0x665544, roughness: 0.9 });
+    // Swing Blocks
     for (let i = 0; i < 5; i++) {
-      const blockGeo = new THREE.PlaneGeometry(4, 4);
-      const blockMesh = new THREE.Mesh(blockGeo, blockMat);
       const bx = 10 + i * 20;
       const by = 4 + (i % 2) * 5;
-      blockMesh.position.set(bx, by, 0);
-      blockMesh.receiveShadow = true;
-      this.scene.add(blockMesh);
-
       const blockBodyDesc = this.rapier.RigidBodyDesc.fixed().setTranslation(bx, by);
       const blockBody = this.world.createRigidBody(blockBodyDesc);
-      const blockColliderDesc = this.rapier.ColliderDesc.cuboid(2, 2);
-      this.world.createCollider(blockColliderDesc, blockBody);
+      this.world.createCollider(this.rapier.ColliderDesc.cuboid(2, 2), blockBody);
+      
+      const bVis = new PIXI.Graphics();
+      bVis.rect(-2 * 40, -2 * 40, 4 * 40, 4 * 40).fill(0x665544);
+      bVis.position.set(bx * 40, -by * 40); // Pixi Y is inverted
+      this.gameplayLayer.addChild(bVis);
     }
     
-    // Boundaries to prevent escaping
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-20, -500))); // Left
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(950, -500))); // Right
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(500, 5), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(400, 60))); // Ceiling
+    // Boundaries
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-20, -500)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(950, -500)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(500, 5), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(400, 60)));
 
-    // Background parallax layers
-    const bgMat1 = new THREE.MeshBasicMaterial({ color: 0x738473 }); // Lighter green
-    const bg1 = new THREE.Mesh(new THREE.PlaneGeometry(300, 50), bgMat1);
-    bg1.position.set(50, 10, -10);
-    this.scene.add(bg1);
+    // Parallax Backgrounds
+    const farBg = new PIXI.Graphics();
+    farBg.rect(0, 0, 5000, 2000).fill(0x738473);
+    this.bgLayerFar.addChild(farBg);
 
-    const bgMat2 = new THREE.MeshBasicMaterial({ color: 0x516251 }); 
-    const bg2 = new THREE.Mesh(new THREE.PlaneGeometry(300, 80), bgMat2);
-    bg2.position.set(50, 20, -20);
-    this.scene.add(bg2);
-
-    // Giant Background Tree Trunks
-    const hugeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x2a1b0a, roughness: 1.0 });
-    for (let i = 0; i < 6; i++) {
-      const tx = i * 40 - 20;
-      const trunk = new THREE.Mesh(new THREE.PlaneGeometry(15 + Math.random() * 10, 200), hugeTrunkMat);
-      trunk.position.set(tx, 50, -30 - Math.random() * 10);
-      trunk.castShadow = true;
-      trunk.receiveShadow = true;
-      this.scene.add(trunk);
-    }
-
-    // Dappled Shadow Canopy (Invisible but casts shadows)
-    const leafMat = new THREE.MeshStandardMaterial({ color: 0x224422, side: THREE.DoubleSide });
-    for (let i = 0; i < 200; i++) {
-      const leaf = new THREE.Mesh(new THREE.PlaneGeometry(15 + Math.random() * 20, 15 + Math.random() * 20), leafMat);
-      leaf.position.set(Math.random() * 300 - 50, 40 + Math.random() * 10, Math.random() * 40 - 10);
-      leaf.rotation.x = Math.random() * Math.PI;
-      leaf.rotation.y = Math.random() * Math.PI;
-      leaf.castShadow = true;
-      this.scene.add(leaf);
+    for (let i = 0; i < 20; i++) {
+      const tx = i * 400 - 200;
+      const trunk = new PIXI.Graphics();
+      trunk.rect(-100, -2000, 200 + Math.random() * 100, 4000).fill(0x2a1b0a);
+      trunk.position.set(tx, 0);
+      this.bgLayerMid.addChild(trunk);
     }
   }
 
-  private onWindowResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-  }
+  private animate(deltaMS: number) {
+    const deltaTime = Math.min(deltaMS / 1000, 0.1);
 
-  private updateMouseWorldPos() {
-    const vec = new THREE.Vector3(this.mouse.x, this.mouse.y, 0.5);
-    vec.unproject(this.camera);
-    const dir = vec.sub(this.camera.position).normalize();
-    const distance = -this.camera.position.z / dir.z;
-    const pos = this.camera.position.clone().add(dir.multiplyScalar(distance));
-    this.mousePos.set(pos.x, pos.y);
-  }
-
-  private animate(time: number = 0) {
-    requestAnimationFrame(this.animate.bind(this));
-    if (!this.hasMouseMoved) {
-      // Fake a mouse position straight up so the body hangs straight down
-      this.mousePos.set(this.robotArm.clawPos.x, this.robotArm.clawPos.y + 4.5);
-    } else {
-      this.updateMouseWorldPos(); 
-    }
-
-    const deltaTime = Math.min((time - this.lastTime) / 1000, 0.1);
-    this.lastTime = time;
-
-    // Physics step
     this.world.step();
-
-    // Logic update
     this.robotArm.update(this.mousePos, this.isMouseDown);
     this.levelManager.update(deltaTime);
 
-    // Camera follow (Claw)
-    const clawPos = this.robotArm.clawPos;
-    this.camera.position.x += (clawPos.x - this.camera.position.x) * 0.1;
-    this.camera.position.y += (clawPos.y - this.camera.position.y) * 0.1;
-    this.camera.lookAt(this.camera.position.x, this.camera.position.y, 0);
+    // Parallax Camera System
+    const targetCamX = this.robotArm.clawPos.x;
+    const targetCamY = this.robotArm.clawPos.y;
+    this.cameraPos.x += (targetCamX - this.cameraPos.x) * 5 * deltaTime;
+    this.cameraPos.y += (targetCamY - this.cameraPos.y) * 5 * deltaTime;
 
-    // Light follow camera
-    this.dirLight.position.x = this.camera.position.x + 10;
-    this.dirLight.target.position.x = this.camera.position.x;
-    this.dirLight.target.updateMatrixWorld();
+    const ppm = 40;
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
 
-    // Render using Composer!
-    this.composer.render();
+    // 1:1 Gameplay Layer
+    this.gameplayLayer.x = cx - this.cameraPos.x * ppm;
+    this.gameplayLayer.y = cy - (-this.cameraPos.y * ppm);
+
+    this.shadowLayer.x = this.gameplayLayer.x;
+    this.shadowLayer.y = this.gameplayLayer.y;
+
+    // Parallax - Midground (Trees)
+    this.bgLayerMid.x = cx - this.cameraPos.x * ppm * 0.5;
+    this.bgLayerMid.y = cy - (-this.cameraPos.y * ppm * 0.5) - 300;
+
+    // Parallax - Far Background
+    this.bgLayerFar.x = cx - this.cameraPos.x * ppm * 0.1 - 2500;
+    this.bgLayerFar.y = cy - (-this.cameraPos.y * ppm * 0.1) - 1000;
   }
 }
 
-// Load Rapier dynamically and start game
 import('@dimforge/rapier2d').then(RAPIER => {
   new Game(RAPIER);
-}).catch(e => console.error("Failed to load Rapier", e));
+});

@@ -1,80 +1,84 @@
-import * as THREE from 'three';
+import * as PIXI from 'pixi.js';
 import * as RAPIER from '@dimforge/rapier2d';
+import { Vec2 } from './Vec2';
 
 export class RobotArm {
-  public bodyMesh: THREE.Mesh;
-  public clawMesh: THREE.Mesh;
+  public bodyMesh: PIXI.Graphics;
+  public clawMesh: PIXI.Graphics;
   
-  private armMeshes: THREE.Mesh[] = [];
-  private jointMeshes: THREE.Mesh[] = [];
+  private armMeshes: PIXI.Graphics[] = [];
+  private jointMeshes: PIXI.Graphics[] = [];
   
-  private joints: THREE.Vector2[] = [];
+  private joints: Vec2[] = [];
   private armLengths: number[] = [2.5, 2.5, 2.5];
 
-  public clawPos: THREE.Vector2;
+  public clawPos: Vec2;
   private rigidBody: RAPIER.RigidBody;
+
 
   private isAttached: boolean = true;
   private prevIsMouseDown: boolean = false;
 
   private rapier: typeof RAPIER;
   private world: RAPIER.World;
-  private clawVelocity: THREE.Vector2 = new THREE.Vector2();
   
-  constructor(scene: THREE.Scene, world: RAPIER.World, rapierModule: typeof RAPIER) {
+  constructor(container: PIXI.Container, world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
     this.world = world;
-    this.clawPos = new THREE.Vector2(0, -5); // Start attached to floor top
+    this.clawPos = new Vec2(0, -5);
 
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.7, side: THREE.DoubleSide });
-    const armMat = new THREE.MeshStandardMaterial({ color: 0x5a5a5a, roughness: 0.6, side: THREE.DoubleSide });
-    const rustMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9, side: THREE.DoubleSide });
+    this.bodyMesh = new PIXI.Graphics();
+    this.bodyMesh.circle(0, 0, 0.8 * 40).fill(0x4a4a4a);
+    container.addChild(this.bodyMesh);
 
-    // Use 2D Circle/Plane geometries
-    this.bodyMesh = new THREE.Mesh(new THREE.CircleGeometry(0.8, 32), bodyMat);
-    this.bodyMesh.position.z = 0.2;
-    this.bodyMesh.castShadow = true;
-    scene.add(this.bodyMesh);
-
-    this.clawMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), rustMat);
-    this.clawMesh.position.z = 0.1;
-    this.clawMesh.castShadow = true;
-    scene.add(this.clawMesh);
+    this.clawMesh = new PIXI.Graphics();
+    this.clawMesh.rect(-0.6 * 40, -0.6 * 40, 1.2 * 40, 1.2 * 40).fill(0x8b5a2b);
+    container.addChild(this.clawMesh);
 
     for (let i = 0; i < 3; i++) {
-      const cylGeo = new THREE.PlaneGeometry(0.5, 1);
-      cylGeo.translate(0, 0.5, 0); 
-      const mesh = new THREE.Mesh(cylGeo, armMat);
-      mesh.position.z = 0.15;
-      mesh.castShadow = true;
-      scene.add(mesh);
-      this.armMeshes.push(mesh);
-      this.joints.push(new THREE.Vector2());
+      const arm = new PIXI.Graphics();
+      arm.rect(-0.25 * 40, 0, 0.5 * 40, 1 * 40).fill(0x5a5a5a);
+      container.addChild(arm);
+      this.armMeshes.push(arm);
+      this.joints.push(new Vec2());
     }
-    this.joints.push(new THREE.Vector2()); 
+    this.joints.push(new Vec2()); 
 
     for (let i = 0; i < 2; i++) {
-      const jMesh = new THREE.Mesh(new THREE.CircleGeometry(0.4, 16), rustMat);
-      jMesh.position.z = 0.18;
-      scene.add(jMesh);
+      const jMesh = new PIXI.Graphics();
+      jMesh.circle(0, 0, 0.4 * 40).fill(0x8b5a2b);
+      container.addChild(jMesh);
       this.jointMeshes.push(jMesh);
     }
 
+    // Body
     const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -1);
     this.rigidBody = world.createRigidBody(rigidBodyDesc);
-    const colliderDesc = this.rapier.ColliderDesc.ball(0.8)
+    const colliderDesc = rapierModule.ColliderDesc.ball(0.8)
       .setMass(2.0)
-      .setSensor(true); // Disable physical collision with environment
+      .setSensor(true);
     world.createCollider(colliderDesc, this.rigidBody);
+
+    // Claw
+    const clawBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -5).setLinearDamping(0.5);
+    this.clawBody = world.createRigidBody(clawBodyDesc);
+    const clawColDesc = rapierModule.ColliderDesc.cuboid(0.6, 0.6)
+      .setMass(0.5); // Lighter claw
+    world.createCollider(clawColDesc, this.clawBody);
+
+    // Rope constraint between them
+    const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
+    const jointParams = rapierModule.JointData.rope(maxDist, {x:0, y:0}, {x:0, y:0});
+    this.ropeJoint = world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
   }
 
-  public update(mousePos: THREE.Vector2, isMouseDown: boolean) {
+  public update(mousePos: Vec2, isMouseDown: boolean) {
     const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
 
     if (this.isAttached) {
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
+      this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
 
-      // Body follows mouse symmetrically
       let clampedMousePos = mousePos.clone();
       if (clampedMousePos.distanceTo(this.clawPos) > maxDist) {
         const dir = clampedMousePos.clone().sub(this.clawPos).normalize();
@@ -88,98 +92,69 @@ export class RobotArm {
       const springForceX = (targetX - currentPos.x) * 6;
       const springForceY = (targetY - currentPos.y) * 6;
       
-      // Fast velocity-based following
       this.rigidBody.setLinvel({ x: springForceX, y: springForceY }, true);
 
-      // Swing Release
       if (this.prevIsMouseDown && !isMouseDown) {
         this.isAttached = false;
-        // No need to set linvel, it already has the actual physics velocity!
+        this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
       }
     } else {
-      // Flying
-      const currentPos = this.rigidBody.translation();
-      
-      // Claw aims towards mouse cursor
-      let dir = mousePos.clone().sub(new THREE.Vector2(currentPos.x, currentPos.y));
-      if (dir.lengthSq() > 0.01) {
-        dir.normalize();
-      } else {
-        dir.set(0, 1);
-      }
-      const targetClawPos = new THREE.Vector2(currentPos.x + dir.x * maxDist, currentPos.y + dir.y * maxDist);
-      
-      // Smoothly interpolate claw towards aim direction
-      const diff = targetClawPos.sub(this.clawPos);
-      this.clawVelocity.add(diff.multiplyScalar(0.1));
-      this.clawVelocity.multiplyScalar(0.7); // damping
-      this.clawPos.add(this.clawVelocity);
-      
-      if (isMouseDown && !this.prevIsMouseDown) { // Just clicked
+      // Flying - Rapier Rope Joint automatically keeps them connected!
+      const bodyPos = this.rigidBody.translation();
+      const cPos = this.clawBody.translation();
+      this.clawPos.set(cPos.x, cPos.y);
+
+      if (isMouseDown && !this.prevIsMouseDown) { 
         const dir = mousePos.clone().sub(this.clawPos);
         if (dir.lengthSq() > 0.001) {
           dir.normalize();
           const ray = new this.rapier.Ray({ x: this.clawPos.x, y: this.clawPos.y }, { x: dir.x, y: dir.y });
-          const maxToi = maxDist * 1.5; // 7.5 * 1.5 = 11.25
-          const solid = true;
-          const hit = this.world.castRay(ray, maxToi, solid, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
+          const hit = this.world.castRay(ray, maxDist * 1.5, true, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
           
           if (hit && !isNaN((hit as any).toi)) {
-            const hitPoint = new THREE.Vector2(
+            const hitPoint = new Vec2(
               ray.origin.x + ray.dir.x * (hit as any).toi,
               ray.origin.y + ray.dir.y * (hit as any).toi
             );
             this.isAttached = true;
             this.clawPos.set(hitPoint.x, hitPoint.y);
-            this.clawVelocity.set(0, 0);
+            this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
+            this.clawBody.setLinvel({ x: 0, y: 0 }, true);
           }
         }
       }
       
-      // Simple floor collision check fallback
-      if (currentPos.y <= -4.1 && currentPos.x < 155) { // Hit forest floor
+      // Auto-attach triggers
+      if (bodyPos.y <= -4.1 && bodyPos.x < 155) { 
         this.isAttached = true;
-        this.clawPos.set(currentPos.x, -5); 
-        this.clawVelocity.set(0, 0);
-      } else if (currentPos.y <= -1499.1 && currentPos.x >= 150) { // Hit factory floor
+        this.clawPos.set(bodyPos.x, -5); 
+        this.clawBody.setTranslation({ x: bodyPos.x, y: -5 }, true);
+        this.clawBody.setLinvel({ x: 0, y: 0 }, true);
+      } else if (bodyPos.y <= -1499.1 && bodyPos.x >= 150) { 
         this.isAttached = true;
-        this.clawPos.set(currentPos.x, -1500);
-        this.clawVelocity.set(0, 0);
+        this.clawPos.set(bodyPos.x, -1500);
+        this.clawBody.setTranslation({ x: bodyPos.x, y: -1500 }, true);
+        this.clawBody.setLinvel({ x: 0, y: 0 }, true);
       }
     }
 
     this.prevIsMouseDown = isMouseDown;
     
-    // Sync body visual
+    // Update visuals
     const pos = this.rigidBody.translation();
-    this.bodyMesh.position.set(pos.x, pos.y, 0.2);
-    
-    // Spring-based constraint for claw during flight (natural pull instead of hard clamp)
-    const base = new THREE.Vector2(pos.x, pos.y);
-    const dist = this.clawPos.distanceTo(base);
-    if (dist > maxDist) {
-      const dir = this.clawPos.clone().sub(base).normalize();
-      // Apply a strong spring force pulling it back to maxDist
-      const overstretch = dist - maxDist;
-      this.clawVelocity.sub(dir.multiplyScalar(overstretch * 20.0));
-      // Still apply a soft clamp to prevent insane flying apart if velocity gets too high
-      if (overstretch > maxDist * 1.5) {
-        this.clawPos.copy(base.clone().add(dir.normalize().multiplyScalar(maxDist * 1.5)));
-      }
-    }
-    this.clawMesh.position.set(this.clawPos.x, this.clawPos.y, 0.1);
+    this.bodyMesh.position.set(pos.x * 40, -pos.y * 40); 
+    this.clawMesh.position.set(this.clawPos.x * 40, -this.clawPos.y * 40);
 
     this.updateIK();
   }
 
   private updateIK() {
-    const base = new THREE.Vector2(this.bodyMesh.position.x, this.bodyMesh.position.y);
+    const base = new Vec2(this.rigidBody.translation().x, this.rigidBody.translation().y);
     const target = this.clawPos.clone();
-    const L = 2.5; // Fixed segment length
+    const L = 2.5; 
     let dist = base.distanceTo(target);
     const maxDist = 3 * L;
 
-    // Visually clamp claw if physics drift causes it to exceed max length
     if (dist > maxDist) {
       const dir = target.clone().sub(base).normalize();
       target.copy(base.clone().add(dir.multiplyScalar(maxDist)));
@@ -198,14 +173,10 @@ export class RobotArm {
     }
 
     if (dist >= maxDist - 0.01) {
-      // Straight line
       this.joints[1].lerpVectors(base, target, 1/3);
       this.joints[2].lerpVectors(base, target, 2/3);
     } else {
-      // Exact 3-segment symmetric IK (Trapezoid folding)
-      const n = new THREE.Vector2(-dir.y, dir.x); 
-      
-      // Calculate theta for symmetric folding
+      const n = new Vec2(-dir.y, dir.x); 
       const cosTheta = Math.max(-1, Math.min(1, (dist - L) / (2 * L)));
       const theta = Math.acos(cosTheta);
       
@@ -219,17 +190,16 @@ export class RobotArm {
       );
     }
 
-    // Update visuals
     for (let i = 0; i < 3; i++) {
       const start = this.joints[i];
       const end = this.joints[i+1];
       
-      this.armMeshes[i].position.set(start.x, start.y, 0.15);
-      this.armMeshes[i].scale.y = L; // Constant length!
-      this.armMeshes[i].rotation.z = Math.atan2(end.y - start.y, end.x - start.x) - Math.PI / 2;
+      this.armMeshes[i].position.set(start.x * 40, -start.y * 40);
+      this.armMeshes[i].scale.set(1, L);
+      this.armMeshes[i].rotation = Math.atan2(-end.y - (-start.y), end.x - start.x) - Math.PI / 2;
       
       if (i < 2) {
-        this.jointMeshes[i].position.set(end.x, end.y, 0.18);
+        this.jointMeshes[i].position.set(end.x * 40, -end.y * 40);
       }
     }
   }
