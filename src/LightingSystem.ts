@@ -4,14 +4,13 @@ import { Vec2 } from './Vec2';
 
 export class LightingSystem {
   private world: RAPIER.World;
-  private rapier: typeof RAPIER;
-  
   public lightContainer: PIXI.Container;
-  private lightGraphicsList: PIXI.Graphics[] = [];
+  private lightMeshes: PIXI.Mesh[] = [];
+  private lightGeometries: PIXI.Geometry[] = [];
   private lightTexture: PIXI.Texture;
 
-  private rayCount: number = 720; 
-  private maxDistance: number = 50;
+  private rayCount: number = 360; // 360 is plenty for smooth shadows
+  private maxDistance: number = 30; // 30m = 1200px, enough for screen
 
   constructor(world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.world = world;
@@ -20,38 +19,54 @@ export class LightingSystem {
     this.lightContainer = new PIXI.Container();
     this.lightContainer.blendMode = 'add';
     
-    // Create a 4096x4096 canvas (radius 2048) so that a maxDistance of 50m (2000px) NEVER reaches the edge, preventing tiling/flickering!
+    // Create a smooth radial gradient texture
     const canvas = document.createElement('canvas');
-    canvas.width = 4096;
-    canvas.height = 4096;
+    const size = 2048;
+    canvas.width = size;
+    canvas.height = size;
     const ctx = canvas.getContext('2d')!;
-    const grd = ctx.createRadialGradient(2048, 2048, 0, 2048, 2048, 2048);
-    grd.addColorStop(0, "rgba(255, 170, 80, 0.12)"); // Bright center (low alpha for 8 layers)
-    grd.addColorStop(1, "rgba(255, 170, 80, 0.0)");  // Fade to completely transparent
+    const grd = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    grd.addColorStop(0, "rgba(255, 170, 80, 0.15)"); // Bright center
+    grd.addColorStop(1, "rgba(255, 170, 80, 0.0)");  // Fade to edge
     ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, 4096, 4096);
+    ctx.fillRect(0, 0, size, size);
     
     this.lightTexture = PIXI.Texture.from(canvas);
 
-    // Use an array of Graphics objects to correctly additively blend without path accumulation
+    // Indices never change
+    const indices = new Uint16Array(this.rayCount * 3);
+    for (let i = 0; i < this.rayCount; i++) {
+      indices[i * 3] = 0; // Center vertex
+      indices[i * 3 + 1] = i + 1;
+      indices[i * 3 + 2] = (i === this.rayCount - 1) ? 1 : i + 2;
+    }
+
     for (let i = 0; i < 8; i++) {
-      const g = new PIXI.Graphics();
-      this.lightGraphicsList.push(g);
-      this.lightContainer.addChild(g);
+      const vertices = new Float32Array((this.rayCount + 1) * 2);
+      const uvs = new Float32Array((this.rayCount + 1) * 2);
+      
+      const geometry = new PIXI.Geometry()
+        .addAttribute('aPosition', vertices, 2)
+        .addAttribute('aUV', uvs, 2)
+        .addIndex(indices);
+        
+      const mesh = new PIXI.Mesh({ geometry, texture: this.lightTexture });
+      
+      this.lightGeometries.push(geometry);
+      this.lightMeshes.push(mesh);
+      this.lightContainer.addChild(mesh);
     }
   }
 
   public update(lightPos: Vec2) {
     const samples = 8;
-    const lightRadius = 0.3; // Creates soft penumbra that blur over distance
+    const lightRadius = 0.3; // Soft penumbra
+    const maxPixelDist = this.maxDistance * 40;
     
-    const matrix = new PIXI.Matrix();
-    matrix.translate(lightPos.x * 40 - 2048, -lightPos.y * 40 - 2048);
+    // Exclude dynamic/kinematic so we don't shadow ourselves
+    const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
 
     for (let s = 0; s < samples; s++) {
-      const g = this.lightGraphicsList[s];
-      g.clear();
-
       const sampleAngle = (s / samples) * Math.PI * 2;
       const offsetX = Math.cos(sampleAngle) * lightRadius;
       const offsetY = Math.sin(sampleAngle) * lightRadius;
@@ -59,32 +74,46 @@ export class LightingSystem {
       const originX = lightPos.x + offsetX;
       const originY = lightPos.y + offsetY;
 
-      const points: {x: number, y: number}[] = [];
+      const geom = this.lightGeometries[s];
+      const vertices = geom.getBuffer('aPosition').data as Float32Array;
+      const uvs = geom.getBuffer('aUV').data as Float32Array;
+
+      // Center vertex in world coordinates
+      vertices[0] = originX * 40;
+      vertices[1] = -originY * 40;
+      uvs[0] = 0.5;
+      uvs[1] = 0.5;
 
       for (let i = 0; i < this.rayCount; i++) {
         const angle = (i / this.rayCount) * Math.PI * 2;
         const dir = { x: Math.cos(angle), y: Math.sin(angle) };
         const ray = new this.rapier.Ray({ x: originX, y: originY }, dir);
         
-        // Exclude Dynamic/Kinematic so the robot doesn't cast shadows on itself!
-        const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
         const hit = this.world.castRay(ray, this.maxDistance, false, filter);
 
-        let hitX, hitY;
+        let hitDist = this.maxDistance;
         if (hit && !isNaN((hit as any).toi)) {
-          const toi = (hit as any).toi;
-          hitX = originX + dir.x * toi;
-          hitY = originY + dir.y * toi;
-        } else {
-          hitX = originX + dir.x * this.maxDistance;
-          hitY = originY + dir.y * this.maxDistance;
+          hitDist = (hit as any).toi;
         }
+        
+        const hitX = originX + dir.x * hitDist;
+        const hitY = originY + dir.y * hitDist;
 
-        points.push({ x: hitX * 40, y: -hitY * 40 });
+        // Vertex positions (world space)
+        const vIdx = (i + 1) * 2;
+        vertices[vIdx] = hitX * 40;
+        vertices[vIdx + 1] = -hitY * 40;
+
+        // UV mapping relative to maxDistance
+        const localX = (hitX - originX) * 40;
+        const localY = (-hitY - (-originY)) * 40;
+        
+        uvs[vIdx] = 0.5 + (localX / maxPixelDist) * 0.5;
+        uvs[vIdx + 1] = 0.5 + (localY / maxPixelDist) * 0.5;
       }
 
-      // Draw the polygon natively filled with the gradient texture
-      g.poly(points).fill({ texture: this.lightTexture, matrix: matrix });
+      geom.getBuffer('aPosition').update();
+      geom.getBuffer('aUV').update();
     }
   }
 }
