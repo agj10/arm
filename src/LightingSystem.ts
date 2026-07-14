@@ -7,7 +7,7 @@ export class LightingSystem {
   private rapier: typeof RAPIER;
   
   public lightContainer: PIXI.Container;
-  private lightGraphics: PIXI.Graphics;
+  private lightGraphicsList: PIXI.Graphics[] = [];
   private lightTexture: PIXI.Texture;
 
   private rayCount: number = 720; 
@@ -32,13 +32,16 @@ export class LightingSystem {
     ctx.fillRect(0, 0, 2048, 2048);
     
     this.lightTexture = PIXI.Texture.from(canvas);
-    this.lightGraphics = new PIXI.Graphics();
-    this.lightContainer.addChild(this.lightGraphics); 
+    
+    // Use an array of Graphics objects to correctly additively blend without path accumulation
+    for (let i = 0; i < 8; i++) {
+      const g = new PIXI.Graphics();
+      this.lightGraphicsList.push(g);
+      this.lightContainer.addChild(g);
+    }
   }
 
   public update(lightPos: Vec2) {
-    this.lightGraphics.clear();
-    
     const samples = 8;
     const lightRadius = 0.3; // Creates soft penumbra that blur over distance
     
@@ -46,6 +49,9 @@ export class LightingSystem {
     matrix.translate(lightPos.x * 40 - 1024, -lightPos.y * 40 - 1024);
 
     for (let s = 0; s < samples; s++) {
+      const g = this.lightGraphicsList[s];
+      g.clear();
+
       const sampleAngle = (s / samples) * Math.PI * 2;
       const offsetX = Math.cos(sampleAngle) * lightRadius;
       const offsetY = Math.sin(sampleAngle) * lightRadius;
@@ -78,7 +84,7 @@ export class LightingSystem {
       }
 
       // Draw the polygon natively filled with the gradient texture
-      this.lightGraphics.poly(points).fill({ texture: this.lightTexture, matrix: matrix });
+      g.poly(points).fill({ texture: this.lightTexture, matrix: matrix });
     }
   }
 }

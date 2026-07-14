@@ -95,24 +95,30 @@ export class RobotArm {
       this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
       this.clawBody.setTranslation({ x: this.clawPos.x, y: this.clawPos.y }, true);
 
-      // Always track mouse directly so player can aim slingshot
+      // Inverted slingshot aiming: Base pulls back in the opposite direction of the mouse
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
       
-      let targetPos = mousePos.clone();
-      if (targetPos.distanceTo(this.clawPos) > maxDist) {
-        const dir = targetPos.clone().sub(this.clawPos).normalize();
-        targetPos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
+      let clampedMousePos = mousePos.clone();
+      if (clampedMousePos.distanceTo(this.clawPos) > maxDist) {
+        const dir = clampedMousePos.clone().sub(this.clawPos).normalize();
+        clampedMousePos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
       }
-      this.rigidBody.setTranslation({ x: targetPos.x, y: targetPos.y }, true);
+      
+      // Base moves opposite to mouse, anchoring at clawPos
+      const targetX = this.clawPos.x - (clampedMousePos.x - this.clawPos.x);
+      const targetY = this.clawPos.y - (clampedMousePos.y - this.clawPos.y);
+
+      this.rigidBody.setTranslation({ x: targetX, y: targetY }, true);
 
       if (this.prevIsMouseDown && !isMouseDown) {
-        // Released! Shoot!
+        // Released! Shoot towards the mouse!
         this.isAttached = false;
         this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
         this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
         
-        const pullX = this.clawPos.x - targetPos.x;
-        const pullY = this.clawPos.y - targetPos.y;
+        // Pull direction is from base towards claw (which is towards clampedMousePos)
+        const pullX = this.clawPos.x - targetX;
+        const pullY = this.clawPos.y - targetY;
         
         this.rigidBody.setLinvel({ x: pullX * 12, y: pullY * 12 }, true);
         this.clawBody.setLinvel({ x: pullX * 12, y: pullY * 12 }, true);
