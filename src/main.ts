@@ -42,7 +42,7 @@ class Game {
   private isMouseDown = false;
   private mousePos = new Vec2();
   private cameraPos = new Vec2(0, 0);
-  private godrayFilter!: GodrayFilter;
+  private sunVisual!: PIXI.Graphics;
 
   constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
@@ -72,42 +72,30 @@ class Game {
 
     this.app.stage.scale.set(0.5); // Zoom out 2x to widen FOV
 
-    this.godrayFilter = new GodrayFilter({
-      alpha: 0.25, // Subtle radial beams, not blinding
-      angle: 0,
-      gain: 0.35,
-      lacunarity: 2.0,
-      time: 0
-    });
-    this.godrayFilter.parallel = false;
-    this.godrayFilter.center = [this.app.screen.width / 2, this.app.screen.height / 2];
-
     const adjustmentFilter = new AdjustmentFilter({
-        gamma: 1.0,
-        contrast: 1.1,
-        saturation: 1.1,
-        brightness: 1.0
+      saturation: 1.2,
+      contrast: 1.1,
+      brightness: 1.05
     });
 
-    // Apply high-quality post-processing shaders
-    this.app.stage.filters = [
-      this.godrayFilter,
+    this.postProcessLayer = new PIXI.Container();
+    this.app.stage.addChild(this.postProcessLayer);
+    
+    // Apply cinematic post-processing to everything
+    this.postProcessLayer.filters = [
       new AdvancedBloomFilter({
-        threshold: 0.85, 
-        bloomScale: 0.4, 
+        threshold: 0.4,
+        bloomScale: 1.5,
         brightness: 1.0,
-        blur: 4,
+        blur: 8,
         quality: 4
       }),
       adjustmentFilter
     ];
 
-    this.postProcessLayer = new PIXI.Container();
-    this.app.stage.addChild(this.postProcessLayer);
-
     this.skyLayer = new PIXI.Container();
     
-    // Draw a sunset Sun in the sky, much lower on the horizon
+    // Draw a sunset Sun in the sky
     const sun = new PIXI.Graphics();
     sun.circle(0, 0, 100).fill({ color: 0xffeadd });
     sun.position.set(window.innerWidth * 0.7, window.innerHeight * 0.7);
@@ -115,9 +103,12 @@ class Game {
     // Add sun halo/glow
     const sunGlow = new PIXI.Graphics();
     sunGlow.circle(0, 0, 300).fill({ color: 0xffaa44, alpha: 0.35 });
+    sunGlow.filters = [new PIXI.BlurFilter(50)];
     sun.addChild(sunGlow);
     
     this.skyLayer.addChild(sun);
+    this.sunVisual = sun;
+    
     this.bgLayerFar = new PIXI.Container();
     this.bgLayerMid = new PIXI.Container();
     this.gameplayLayer = new PIXI.Container();
@@ -237,18 +228,13 @@ class Game {
     this.robotArm.update(this.mousePos, this.isMouseDown);
     this.levelManager.update(deltaTime);
     
-    // (Filters are static now, no need to update CRT seeds)
-
     // Update Cinematic Shaders
-    // Center the sun in the screen to cast shadows radially outwards
     const sunWorldPos = new Vec2(this.cameraPos.x, this.cameraPos.y);
     this.lightingSystem.update(sunWorldPos);
 
     // Parallax Camera System
     const targetCamX = this.robotArm.clawPos.x;
-    // Look 12 units ABOVE the claw, so the claw is at the bottom of the screen
-    // This places the sun (camera center) high in the sky to cast shadows downwards!
-    const targetCamY = this.robotArm.clawPos.y + 12; 
+    const targetCamY = this.robotArm.clawPos.y; 
     this.cameraPos.x += (targetCamX - this.cameraPos.x) * 5 * deltaTime;
     this.cameraPos.y += (targetCamY - this.cameraPos.y) * 5 * deltaTime;
     
@@ -256,6 +242,10 @@ class Game {
     const stageScale = 0.5;
     const cx = (window.innerWidth / 2) / stageScale;
     const cy = (window.innerHeight / 2) / stageScale;
+
+    // Fix Sun directly in the center of the screen
+    this.sunVisual.position.set(cx + this.cameraPos.x * ppm, cy + (-this.cameraPos.y * ppm));
+
     this.gameplayLayer.x = cx - this.cameraPos.x * ppm;
     this.gameplayLayer.y = cy - (-this.cameraPos.y * ppm);
 
