@@ -127,22 +127,9 @@ class Game {
     
     // Dark Ambient Shadow (Sunset Twilight)
     const shadowOverlay = new PIXI.Graphics();
-    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x221133, alpha: 0.85 }); // Much darker twilight
+    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x221133, alpha: 0.65 }); // Brighter shadow
     this.shadowLayer.addChild(shadowOverlay);
     
-    // Leaf shadow overlay
-    PIXI.Assets.load('/leaf_shadows.png').then((texture) => {
-      this.leafOverlay = new PIXI.TilingSprite({
-        texture: texture,
-        width: window.innerWidth * 2,
-        height: window.innerHeight * 2
-      });
-      this.leafOverlay.blendMode = 'multiply';
-      this.leafOverlay.alpha = 0.5;
-      this.leafOverlay.position.set(-window.innerWidth/2, -window.innerHeight/2);
-      this.shadowLayer.addChild(this.leafOverlay);
-    });
-
     this.shadowLayer.blendMode = 'multiply';
     this.postProcessLayer.addChild(this.shadowLayer);
 
@@ -251,27 +238,13 @@ class Game {
     // Update Dynamic Raycast Lighting (from a fixed position like the Sun)
     // We simulate the sun being far away to the top right
     const sunWorldPos = new Vec2(this.cameraPos.x + 30, this.cameraPos.y + 40);
-    this.lightingSystem.update(sunWorldPos);
+    this.lightingSystem.update(sunWorldPos, this.cameraPos);
 
     // Parallax Camera System
     const targetCamX = this.robotArm.clawPos.x;
     const targetCamY = this.robotArm.clawPos.y;
     this.cameraPos.x += (targetCamX - this.cameraPos.x) * 5 * deltaTime;
     this.cameraPos.y += (targetCamY - this.cameraPos.y) * 5 * deltaTime;
-
-    if (this.leafOverlay) {
-      // Move leaf shadows slowly for parallax
-      this.leafOverlay.tilePosition.x = -this.cameraPos.x * 5;
-      this.leafOverlay.tilePosition.y = this.cameraPos.y * 5;
-
-      // Fade out leaf shadows when going underground (Y < -15)
-      const depth = -this.cameraPos.y;
-      if (depth > 15) {
-        this.leafOverlay.alpha = Math.max(0, 0.5 - (depth - 15) * 0.05);
-      } else {
-        this.leafOverlay.alpha = 0.5;
-      }
-    }
 
     const ppm = 40;
     const cx = window.innerWidth / 2;

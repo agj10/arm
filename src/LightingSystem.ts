@@ -1,6 +1,7 @@
 import * as PIXI from 'pixi.js';
 import * as RAPIER from '@dimforge/rapier2d';
 import { Vec2 } from './Vec2';
+import { PixelateFilter } from 'pixi-filters';
 
 export class LightingSystem {
   private world: RAPIER.World;
@@ -8,6 +9,7 @@ export class LightingSystem {
   
   public lightContainer: PIXI.Container;
   private lightGraphics: PIXI.Graphics;
+  public leafOverlay?: PIXI.TilingSprite;
 
   private rayCount: number = 180; // Optimized for performance
   private maxDistance: number = 100; // In rapier units (meters)
@@ -19,15 +21,33 @@ export class LightingSystem {
     this.rapier = rapierModule;
 
     this.lightContainer = new PIXI.Container();
+    // Force container to render offscreen so children blend together first
+    this.lightContainer.filters = [new PIXI.AlphaFilter({ alpha: 1.0 })];
     this.lightContainer.blendMode = 'add';
     
     this.lightGraphics = new PIXI.Graphics();
-    this.lightGraphics.blendMode = 'add'; // Additive per polygon
+    this.lightGraphics.blendMode = 'normal'; // Drawn normally into the offscreen buffer
 
     this.lightContainer.addChild(this.lightGraphics);
+
+    // Load and add leaf shadows directly to the light
+    PIXI.Assets.load('/leaf_shadows.png').then((texture) => {
+      this.leafOverlay = new PIXI.TilingSprite({
+        texture: texture,
+        width: 4000,
+        height: 4000
+      });
+      // Multiply blend mode cuts out the light where leaves are black
+      this.leafOverlay.blendMode = 'multiply';
+      // Pixelate and increase density
+      this.leafOverlay.filters = [new PixelateFilter([4, 4])];
+      this.leafOverlay.tileScale.set(0.35); 
+      this.leafOverlay.position.set(-2000, -2000);
+      this.lightContainer.addChild(this.leafOverlay);
+    });
   }
 
-  public update(lightPos: Vec2) {
+  public update(lightPos: Vec2, cameraPos: Vec2) {
     this.lightGraphics.clear();
     
     // Warm sunset orange, bright center
@@ -70,6 +90,19 @@ export class LightingSystem {
       }
 
       this.lightGraphics.poly(points).fill({ color: color, alpha: alpha });
+    }
+
+    if (this.leafOverlay) {
+      this.leafOverlay.tilePosition.x = -cameraPos.x * 5;
+      this.leafOverlay.tilePosition.y = cameraPos.y * 5;
+
+      // Fade out leaf shadows when going underground
+      const depth = -cameraPos.y;
+      if (depth > 15) {
+        this.leafOverlay.alpha = Math.max(0, 1.0 - (depth - 15) * 0.05);
+      } else {
+        this.leafOverlay.alpha = 1.0;
+      }
     }
   }
 }
