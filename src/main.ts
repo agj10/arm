@@ -3,6 +3,7 @@ import * as PIXI from 'pixi.js';
 import { RobotArm } from './RobotArm';
 import { UIManager } from './UIManager';
 import { LevelManager } from './LevelManager';
+import { LightingSystem } from './LightingSystem';
 import { Vec2 } from './Vec2';
 import * as RAPIER from '@dimforge/rapier2d';
 
@@ -25,6 +26,7 @@ class Game {
   private robotArm!: RobotArm;
   private uiManager!: UIManager;
   private levelManager!: LevelManager;
+  private lightingSystem!: LightingSystem;
 
   // Parallax Layers
   private skyLayer!: PIXI.Container;
@@ -49,16 +51,24 @@ class Game {
     this.uiManager = new UIManager();
     
     this.app = new PIXI.Application();
+    
+    // Pixel Art settings
+    PIXI.AbstractRenderer.defaultOptions.resolution = 0.5; // Downsample for pixel effect
+    PIXI.AbstractRenderer.defaultOptions.roundPixels = true;
+    PIXI.TextureStyle.defaultOptions.scaleMode = 'nearest';
+
     await this.app.init({ 
       width: window.innerWidth, 
       height: window.innerHeight, 
-      backgroundColor: 0xdfefff, // Sky blue
+      backgroundColor: 0x050510, // Dark night sky
       resizeTo: window,
-      antialias: false
+      antialias: false,
+      resolution: 0.5
     });
     
     const container = document.getElementById('game-container')!;
-    container.innerHTML = ''; // Clear Three.js canvas if any
+    container.innerHTML = ''; 
+    this.app.canvas.style.imageRendering = 'pixelated'; // CSS pixelation
     container.appendChild(this.app.canvas);
 
     this.postProcessLayer = new PIXI.Container();
@@ -75,39 +85,22 @@ class Game {
     this.postProcessLayer.addChild(this.bgLayerFar);
     this.postProcessLayer.addChild(this.bgLayerMid);
     this.postProcessLayer.addChild(this.gameplayLayer);
-    this.postProcessLayer.addChild(this.shadowLayer);
-    this.postProcessLayer.addChild(this.lightLayer);
-
-    // 2D Light Texture Generator (Radial Gradient)
-    const canvas = document.createElement('canvas');
-    canvas.width = 512; canvas.height = 512;
-    const ctx = canvas.getContext('2d')!;
-    const grd = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
-    grd.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, 512, 512);
-    const lightTex = PIXI.Texture.from(canvas);
-
-    // Giant Sun Light
-    const sunLight = new PIXI.Sprite(lightTex);
-    sunLight.anchor.set(0.5);
-    sunLight.scale.set(6.0); // Huge glow
-    sunLight.tint = 0xffeebb; // Warm sunlight
-    sunLight.blendMode = 'add';
-    sunLight.alpha = 0.8;
-    sunLight.position.set(400, -200);
-    this.lightLayer.addChild(sunLight);
-
-    // Dappled Shadow Setup (Multiply Blend Mode)
+    
+    // Dark Ambient Shadow
     const shadowOverlay = new PIXI.Graphics();
-    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x223355, alpha: 0.3 }); // Lighter overall shadow
+    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x0a0a1a, alpha: 0.9 }); // Very dark
     this.shadowLayer.addChild(shadowOverlay);
     this.shadowLayer.blendMode = 'multiply';
+    this.postProcessLayer.addChild(this.shadowLayer);
 
     // Physics World
     const gravity = { x: 0.0, y: -30.0 };
     this.world = new this.rapier.World(gravity);
+
+    // Dynamic Lighting System
+    this.lightingSystem = new LightingSystem(this.world, this.rapier);
+    this.lightLayer = this.lightingSystem.lightContainer;
+    this.postProcessLayer.addChild(this.lightLayer);
 
     // Create Robot Arm
     this.robotArm = new RobotArm(this.gameplayLayer, this.world, this.rapier);
@@ -165,13 +158,6 @@ class Game {
       const blockBody = this.world.createRigidBody(blockBodyDesc);
       this.world.createCollider(this.rapier.ColliderDesc.cuboid(2, 2), blockBody);
       
-      // Shadow (skewed and offset)
-      const bShadow = new PIXI.Graphics();
-      bShadow.rect(-2 * 40, -2 * 40, 4 * 40, 4 * 40).fill({ color: 0x000000, alpha: 0.5 });
-      bShadow.position.set(bx * 40 + 20, -by * 40 + 20); // Offset down-right
-      bShadow.skew.x = 0.3; // Skew away from light
-      this.gameplayLayer.addChild(bShadow);
-
       const bVis = new PIXI.Graphics();
       bVis.rect(-2 * 40, -2 * 40, 4 * 40, 4 * 40).fill(0x665544);
       bVis.position.set(bx * 40, -by * 40); // Pixi Y is inverted
@@ -203,6 +189,9 @@ class Game {
     this.world.step();
     this.robotArm.update(this.mousePos, this.isMouseDown);
     this.levelManager.update(deltaTime);
+    
+    // Update Dynamic Raycast Lighting
+    this.lightingSystem.update(this.robotArm.clawPos);
 
     // Parallax Camera System
     const targetCamX = this.robotArm.clawPos.x;
