@@ -26,13 +26,13 @@ export class LightingSystem {
     const grd = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
     grd.addColorStop(0, 'rgba(255, 255, 255, 1)');
     grd.addColorStop(0.5, 'rgba(255, 255, 255, 0.5)');
-    grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, 512, 512);
     
     this.lightSprite = new PIXI.Sprite(PIXI.Texture.from(canvas));
     this.lightSprite.anchor.set(0.5);
-    this.lightSprite.scale.set(2.0); // Reduced scale for better look
+    this.lightSprite.scale.set(8.0); // Large enough to cover screen smoothly
     this.lightSprite.tint = 0xffeebb;
     this.lightSprite.blendMode = 'add';
     
@@ -60,18 +60,15 @@ export class LightingSystem {
     for (let i = 0; i < this.rayCount; i++) {
       const angle = (i / this.rayCount) * Math.PI * 2;
       const dir = { x: Math.cos(angle), y: Math.sin(angle) };
-      
-      // Shift origin slightly to avoid hitting the claw itself (radius is ~0.6)
-      const originX = lightPos.x + dir.x * 1.0;
-      const originY = lightPos.y + dir.y * 1.0;
 
       const ray = new this.rapier.Ray(
-        { x: originX, y: originY },
+        { x: lightPos.x, y: lightPos.y },
         dir
       );
 
-      // Cast ray against everything
-      const hit = this.world.castRay(ray, this.maxDistance, true);
+      // Cast ray against static objects only to prevent flickering with the claw/body
+      // QueryFilterFlags.EXCLUDE_DYNAMIC = 2
+      const hit = this.world.castRay(ray, this.maxDistance, true, 2 as any);
       
       let hitX, hitY;
       if (hit) {
