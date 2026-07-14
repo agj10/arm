@@ -81,9 +81,7 @@ class Game {
         blur: 8,
         quality: 4
       }),
-      new PixelateFilter({
-        size: 3 // Gives a clean, modern pixel art look without CRT artifacts
-      })
+      new PixelateFilter([3, 3])
     ];
 
     this.postProcessLayer = new PIXI.Container();
