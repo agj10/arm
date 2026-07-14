@@ -61,8 +61,12 @@ export class LightingSystem {
       const angle = (i / this.rayCount) * Math.PI * 2;
       const dir = { x: Math.cos(angle), y: Math.sin(angle) };
       
+      // Shift origin slightly to avoid hitting the claw itself (radius is ~0.6)
+      const originX = lightPos.x + dir.x * 1.0;
+      const originY = lightPos.y + dir.y * 1.0;
+
       const ray = new this.rapier.Ray(
-        { x: lightPos.x, y: lightPos.y },
+        { x: originX, y: originY },
         dir
       );
 

@@ -6,6 +6,7 @@ import { LevelManager } from './LevelManager';
 import { LightingSystem } from './LightingSystem';
 import { Vec2 } from './Vec2';
 import * as RAPIER from '@dimforge/rapier2d';
+import { CRTFilter, AdvancedBloomFilter } from 'pixi-filters';
 
 // Fetch and display version
 fetch('/version.json')
@@ -70,6 +71,27 @@ class Game {
     container.innerHTML = ''; 
     this.app.canvas.style.imageRendering = 'pixelated'; // CSS pixelation
     container.appendChild(this.app.canvas);
+
+    // Apply high-quality post-processing shaders
+    this.app.stage.filters = [
+      new AdvancedBloomFilter({
+        threshold: 0.6,
+        bloomScale: 1.2,
+        brightness: 1.0,
+        blur: 8,
+        quality: 4
+      }),
+      new CRTFilter({
+        curvature: 1.5,
+        lineWidth: 1.0,
+        lineContrast: 0.25,
+        noise: 0.15,
+        vignetting: 0.4,
+        vignettingAlpha: 0.8,
+        vignettingBlur: 0.4,
+        seed: Math.random()
+      })
+    ];
 
     this.postProcessLayer = new PIXI.Container();
     this.app.stage.addChild(this.postProcessLayer);
@@ -190,6 +212,15 @@ class Game {
     this.robotArm.update(this.mousePos, this.isMouseDown);
     this.levelManager.update(deltaTime);
     
+    // Update CRT seed for dynamic noise
+    if (this.app.stage.filters) {
+      const crt = this.app.stage.filters.find(f => f instanceof CRTFilter) as CRTFilter;
+      if (crt) {
+        crt.seed = Math.random();
+        crt.time += deltaTime * 0.05;
+      }
+    }
+
     // Update Dynamic Raycast Lighting
     this.lightingSystem.update(this.robotArm.clawPos);
 
