@@ -67,12 +67,13 @@ export class LightingSystem {
       );
 
       // Cast ray against everything
-      const hit = this.world.castRay(ray, this.maxDistance, true, 0xFFFFFFFF);
+      const hit = this.world.castRay(ray, this.maxDistance, true);
       
       let hitX, hitY;
       if (hit) {
-        hitX = lightPos.x + dir.x * hit.toi;
-        hitY = lightPos.y + dir.y * hit.toi;
+        const toi = (hit as any).toi ?? (hit as any).timeOfImpact ?? (hit as any).time_of_impact ?? this.maxDistance;
+        hitX = lightPos.x + dir.x * toi;
+        hitY = lightPos.y + dir.y * toi;
       } else {
         hitX = lightPos.x + dir.x * this.maxDistance;
         hitY = lightPos.y + dir.y * this.maxDistance;
