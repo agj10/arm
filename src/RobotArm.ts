@@ -116,7 +116,7 @@ export class RobotArm {
       this.clawPos.add(this.clawVelocity);
       
       if (isMouseDown && !this.prevIsMouseDown) { // Just clicked
-        const dir = pos.clone().sub(this.clawPos);
+        const dir = mousePos.clone().sub(this.clawPos);
         if (dir.lengthSq() > 0.001) {
           dir.normalize();
           const ray = new this.rapier.Ray({ x: this.clawPos.x, y: this.clawPos.y }, { x: dir.x, y: dir.y });
