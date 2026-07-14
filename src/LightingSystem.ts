@@ -39,8 +39,6 @@ export class LightingSystem {
   public update(lightPos: Vec2) {
     this.lightGraphics.clear();
     
-    const color = 0xffa050; 
-    const alpha = 0.04; 
     const samples = 8;
     // Tiny radius eliminates circular artifact at start, but still creates blur over distance
     const lightRadius = 0.05; 
