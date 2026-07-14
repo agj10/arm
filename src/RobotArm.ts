@@ -83,20 +83,6 @@ export class RobotArm {
       this.jointMeshes.push(jMesh);
     }
 
-    // Body
-    const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -1);
-    this.rigidBody = world.createRigidBody(rigidBodyDesc);
-    const colliderDesc = rapierModule.ColliderDesc.ball(0.8)
-      .setMass(2.0)
-      .setSensor(true);
-    world.createCollider(colliderDesc, this.rigidBody);
-
-    // Claw
-    const clawBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -5).setLinearDamping(0.5);
-    this.clawBody = world.createRigidBody(clawBodyDesc);
-    const clawColDesc = rapierModule.ColliderDesc.cuboid(0.6, 0.6)
-      .setMass(0.5); // Lighter claw
-    world.createCollider(clawColDesc, this.clawBody);
 
     // Rope constraint between them
     const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
