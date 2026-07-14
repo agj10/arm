@@ -9,8 +9,10 @@ export class LightingSystem {
   public lightContainer: PIXI.Container;
   private lightGraphics: PIXI.Graphics;
 
-  private rayCount: number = 360; // High resolution for smooth surfaces
+  private rayCount: number = 360; // Smooth polygons
   private maxDistance: number = 100; // In rapier units (meters)
+  private samples: number = 5; // Stepped banding
+  private lightRadius: number = 1.0; // Area light radius
 
   constructor(world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.world = world;
@@ -20,10 +22,7 @@ export class LightingSystem {
     this.lightContainer.blendMode = 'add';
     
     this.lightGraphics = new PIXI.Graphics();
-    
-    // Apply a high-quality blur filter to create smooth, soft shadows without banding
-    const blurFilter = new PIXI.BlurFilter({ strength: 16, quality: 4 });
-    this.lightGraphics.filters = [blurFilter];
+    this.lightGraphics.blendMode = 'add'; // Additive per polygon
 
     this.lightContainer.addChild(this.lightGraphics);
   }
@@ -31,38 +30,46 @@ export class LightingSystem {
   public update(lightPos: Vec2) {
     this.lightGraphics.clear();
     
-    // Very subtle, moody sunset orange light
-    const color = 0xff6622; 
-    const alpha = 0.35; // Greatly reduced to prevent blinding whiteout
+    // Start with a very pale yellow-white, it will blend additively
+    const color = 0xffeebb; 
+    const alpha = 0.08; // Very subtle per step
 
-    const points: {x: number, y: number}[] = [];
+    for (let s = 0; s < this.samples; s++) {
+      const sampleAngle = (s / this.samples) * Math.PI * 2;
+      const offsetX = Math.cos(sampleAngle) * this.lightRadius;
+      const offsetY = Math.sin(sampleAngle) * this.lightRadius;
 
-    for (let i = 0; i < this.rayCount; i++) {
-      const angle = (i / this.rayCount) * Math.PI * 2;
-      const dir = { x: Math.cos(angle), y: Math.sin(angle) };
+      const originX = lightPos.x + offsetX;
+      const originY = lightPos.y + offsetY;
 
-      const ray = new this.rapier.Ray(
-        { x: lightPos.x, y: lightPos.y },
-        dir
-      );
+      const points: {x: number, y: number}[] = [];
 
-      // Exclude dynamic bodies (2)
-      const hit = this.world.castRay(ray, this.maxDistance, true, 2 as any);
-      
-      let hitX, hitY;
-      if (hit) {
-        const toi = (hit as any).toi ?? (hit as any).timeOfImpact ?? (hit as any).time_of_impact ?? this.maxDistance;
-        hitX = lightPos.x + dir.x * toi;
-        hitY = lightPos.y + dir.y * toi;
-      } else {
-        hitX = lightPos.x + dir.x * this.maxDistance;
-        hitY = lightPos.y + dir.y * this.maxDistance;
+      for (let i = 0; i < this.rayCount; i++) {
+        const angle = (i / this.rayCount) * Math.PI * 2;
+        const dir = { x: Math.cos(angle), y: Math.sin(angle) };
+
+        const ray = new this.rapier.Ray(
+          { x: originX, y: originY },
+          dir
+        );
+
+        // Cast ray against ALL objects including player (so arm casts shadow!)
+        const hit = this.world.castRay(ray, this.maxDistance, true);
+        
+        let hitX, hitY;
+        if (hit) {
+          const toi = (hit as any).toi ?? (hit as any).timeOfImpact ?? (hit as any).time_of_impact ?? this.maxDistance;
+          hitX = originX + dir.x * toi;
+          hitY = originY + dir.y * toi;
+        } else {
+          hitX = originX + dir.x * this.maxDistance;
+          hitY = originY + dir.y * this.maxDistance;
+        }
+        
+        points.push({ x: hitX * 40, y: -hitY * 40 });
       }
-      
-      // Convert to Pixi coordinates
-      points.push({ x: hitX * 40, y: -hitY * 40 });
-    }
 
-    this.lightGraphics.poly(points).fill({ color: color, alpha: alpha });
+      this.lightGraphics.poly(points).fill({ color: color, alpha: alpha });
+    }
   }
 }

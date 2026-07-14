@@ -18,15 +18,20 @@ export class LevelManager {
 
     if (!this.initDone) {
       this.uiManager.showAreaTitle('외진 숲');
+      this.uiManager.showAreaTitle('Sector 00');
       this.initDone = true;
+      this.lastEventTime = currentTime;
     }
 
     switch (this.state) {
       case 'FOREST':
         if (px > 120) { 
-          this.state = 'FACTORY_ENTRANCE';
-          this.uiManager.showAreaTitle('무너진 공장');
-          this.uiManager.showSubtitle('자연에 파묻힌 이 곳... 컨베이어 벨트가 아직 작동하고 있다...', true);
+          if (currentTime - this.lastEventTime > 2) {
+            this.state = 'FACTORY_ENTRANCE';
+            this.uiManager.showAreaTitle('Sector 01');
+            this.uiManager.showSubtitle('SYSTEM ONLINE', true);
+            this.eventState = 1;
+          }
         }
         break;
       
@@ -34,7 +39,7 @@ export class LevelManager {
         if (py < -20) { 
           this.state = 'DROP';
           this.uiManager.clearSubtitle();
-          this.uiManager.showSubtitle('철컥.', false);
+          this.uiManager.showSubtitle('CRITICAL ERROR', false);
         }
         break;
         

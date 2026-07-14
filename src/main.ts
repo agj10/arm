@@ -88,14 +88,13 @@ class Game {
     this.app.stage.filters = [
       this.godrayFilter,
       new AdvancedBloomFilter({
-        threshold: 0.85, // Higher threshold so only very bright things bloom
-        bloomScale: 0.5, // Reduced intensity
+        threshold: 0.85, 
+        bloomScale: 0.4, 
         brightness: 1.0,
         blur: 4,
         quality: 4
       }),
-      adjustmentFilter,
-      new PixelateFilter([3, 3])
+      adjustmentFilter
     ];
 
     this.postProcessLayer = new PIXI.Container();
