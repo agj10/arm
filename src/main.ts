@@ -48,12 +48,12 @@ class Game {
     
     // Scene setup
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x111111);
-    this.scene.fog = new THREE.FogExp2(0x111111, 0.02);
+    this.scene.background = new THREE.Color(0x2a3b4c);
+    this.scene.fog = new THREE.FogExp2(0x2a3b4c, 0.015);
 
     // Camera setup (2.5D perspective)
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.camera.position.z = 20;
+    this.camera.position.z = 45;
 
     // Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: false });
@@ -64,10 +64,10 @@ class Game {
     container.appendChild(this.renderer.domElement);
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
     dirLight.position.set(10, 20, 10);
     dirLight.castShadow = true;
     dirLight.shadow.camera.top = 50;
@@ -99,7 +99,7 @@ class Game {
 
     const vignettePass = new ShaderPass(VignetteShader);
     vignettePass.uniforms["offset"].value = 1.0;
-    vignettePass.uniforms["darkness"].value = 1.5;
+    vignettePass.uniforms["darkness"].value = 0.8;
     this.composer.addPass(vignettePass);
 
     const RadialCA = {
@@ -170,17 +170,28 @@ class Game {
     // Static Floor & Platforms - 2D Planes
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x557755, roughness: 1.0 }); 
     
-    // Main long floor
-    const floorGeo = new THREE.PlaneGeometry(1000, 20);
-    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
-    floorMesh.position.set(400, -15, 0); // Center at -15. Top is at -5.
-    floorMesh.receiveShadow = true;
-    this.scene.add(floorMesh);
+    // Forest Floor (x: -50 to 150)
+    const floorGeo1 = new THREE.PlaneGeometry(200, 20);
+    const floorMesh1 = new THREE.Mesh(floorGeo1, floorMat);
+    floorMesh1.position.set(50, -15, 0); // Center at 50, top at -5
+    floorMesh1.receiveShadow = true;
+    this.scene.add(floorMesh1);
 
-    const floorBodyDesc = this.rapier.RigidBodyDesc.fixed().setTranslation(400, -15);
-    const floorBody = this.world.createRigidBody(floorBodyDesc);
-    const floorColliderDesc = this.rapier.ColliderDesc.cuboid(500, 10);
-    this.world.createCollider(floorColliderDesc, floorBody);
+    const floorBodyDesc1 = this.rapier.RigidBodyDesc.fixed().setTranslation(50, -15);
+    const floorBody1 = this.world.createRigidBody(floorBodyDesc1);
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(100, 10), floorBody1);
+
+    // Underground Factory Floor (x: 150 to 950)
+    const factoryMat = new THREE.MeshStandardMaterial({ color: 0x444455, roughness: 0.8 });
+    const floorGeo2 = new THREE.PlaneGeometry(800, 20);
+    const floorMesh2 = new THREE.Mesh(floorGeo2, factoryMat);
+    floorMesh2.position.set(550, -70, 0); // Drop down, top at -60
+    floorMesh2.receiveShadow = true;
+    this.scene.add(floorMesh2);
+
+    const floorBodyDesc2 = this.rapier.RigidBodyDesc.fixed().setTranslation(550, -70);
+    const floorBody2 = this.world.createRigidBody(floorBodyDesc2);
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(400, 10), floorBody2);
 
     // Some extra blocks to swing on
     const blockMat = new THREE.MeshStandardMaterial({ color: 0x665544, roughness: 0.9 });
@@ -200,9 +211,9 @@ class Game {
     }
     
     // Boundaries to prevent escaping
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 50), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-20, 30))); // Left
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 50), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(120, 30))); // Right
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(150, 5), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(50, 60))); // Ceiling
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 100), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-20, 30))); // Left
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 100), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(950, 30))); // Right
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(500, 5), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(400, 60))); // Ceiling
 
     // Background parallax layers
     const bgMat1 = new THREE.MeshBasicMaterial({ color: 0x334433 });

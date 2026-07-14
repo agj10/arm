@@ -85,8 +85,8 @@ export class RobotArm {
       const targetY = this.clawPos.y - (clampedMousePos.y - this.clawPos.y);
 
       const currentPos = this.rigidBody.translation();
-      const springForceX = (targetX - currentPos.x) * 15;
-      const springForceY = (targetY - currentPos.y) * 15;
+      const springForceX = (targetX - currentPos.x) * 6;
+      const springForceY = (targetY - currentPos.y) * 6;
       
       // Fast velocity-based following
       this.rigidBody.setLinvel({ x: springForceX, y: springForceY }, true);
@@ -130,11 +130,14 @@ export class RobotArm {
         }
       }
       
-      // Simple floor collision check
-      // Body radius is 0.8. Floor top is -5. 
-      if (currentPos.y <= -4.1) { // Hit floor
+      // Simple floor collision check fallback
+      if (currentPos.y <= -4.1 && currentPos.x < 155) { // Hit forest floor
         this.isAttached = true;
-        this.clawPos.set(currentPos.x, -5); // attach to floor top
+        this.clawPos.set(currentPos.x, -5); 
+        this.clawVelocity.set(0, 0);
+      } else if (currentPos.y <= -59.1 && currentPos.x >= 150) { // Hit factory floor
+        this.isAttached = true;
+        this.clawPos.set(currentPos.x, -60);
         this.clawVelocity.set(0, 0);
       }
     }
@@ -144,6 +147,14 @@ export class RobotArm {
     // Sync body visual
     const pos = this.rigidBody.translation();
     this.bodyMesh.position.set(pos.x, pos.y, 0.2);
+    
+    // Hard-clamp clawPos to max length to prevent visual separation
+    const base = new THREE.Vector2(pos.x, pos.y);
+    const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
+    if (this.clawPos.distanceTo(base) > maxDist) {
+      const dir = this.clawPos.clone().sub(base).normalize();
+      this.clawPos.copy(base.clone().add(dir.multiplyScalar(maxDist)));
+    }
     this.clawMesh.position.set(this.clawPos.x, this.clawPos.y, 0.1);
 
     this.updateIK();

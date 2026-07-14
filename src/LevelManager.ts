@@ -15,6 +15,7 @@ export class LevelManager {
 
   public update(deltaTime: number) {
     const px = this.robotArm.clawPos.x;
+    const py = this.robotArm.clawPos.y;
 
     if (!this.initDone) {
       this.uiManager.showAreaTitle('외진 숲');
@@ -23,50 +24,24 @@ export class LevelManager {
 
     switch (this.state) {
       case 'FOREST':
-        if (px > 150) { 
+        if (px > 120) { 
           this.state = 'FACTORY_ENTRANCE';
           this.uiManager.showAreaTitle('무너진 공장');
+          this.uiManager.showSubtitle('자연에 파묻힌 이 곳... 컨베이어 벨트가 아직 작동하고 있다...', true);
         }
         break;
       
       case 'FACTORY_ENTRANCE':
-        if (px > 250) { 
-          this.state = 'CONVEYOR';
-          this.timer = 0;
-          this.uiManager.showSubtitle('자연에 파묻힌 이 곳... 컨베이어 벨트가 아직 작동하고 있다...', true);
-        }
-        break;
-        
-      case 'CONVEYOR':
-        this.robotArm.clawPos.x += 10 * deltaTime;
-        
-        this.timer += deltaTime;
-        if (this.timer > 5) {
-          this.state = 'TITLE';
-          this.timer = 0;
-          this.uiManager.clearSubtitle();
-          this.uiManager.showAreaTitle('A R M'); 
-        }
-        break;
-        
-      case 'TITLE':
-        this.robotArm.clawPos.x += 10 * deltaTime;
-        
-        this.timer += deltaTime;
-        if (this.timer > 8) { 
+        if (py < -20) { 
           this.state = 'DROP';
-          this.timer = 0;
+          this.uiManager.clearSubtitle();
           this.uiManager.showSubtitle('철컥.', false);
         }
         break;
         
       case 'DROP':
-        this.robotArm.clawPos.y -= 25 * deltaTime;
-        
-        this.timer += deltaTime;
-        if (this.timer > 3) {
+        if (py < -50) {
           this.state = 'UNDERGROUND';
-          this.timer = 0;
           this.uiManager.clearSubtitle();
           this.uiManager.showAreaTitle('공장 지하 구역');
         }
