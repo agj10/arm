@@ -13,10 +13,9 @@ export class RobotArm {
   private armLengths: number[] = [2.5, 2.5, 2.5];
 
   public clawPos: Vec2;
-  private rigidBody: RAPIER.RigidBody;
-
-
-  private isAttached: boolean = true;
+  private clawBody: RAPIER.RigidBody;
+  // @ts-ignore
+  private ropeJoint: RAPIER.ImpulseJoint;  private isAttached: boolean = true;
   private prevIsMouseDown: boolean = false;
 
   private rapier: typeof RAPIER;
