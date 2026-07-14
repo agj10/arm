@@ -65,6 +65,8 @@ export class RobotArm {
     world.createCollider(colliderDesc, this.rigidBody);
   }
 
+  private clawVelocity: THREE.Vector2 = new THREE.Vector2();
+
   public update(mousePos: THREE.Vector2, isMouseDown: boolean) {
     if (this.isAttached) {
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
@@ -100,28 +102,33 @@ export class RobotArm {
       const currentPos = this.rigidBody.translation();
       const currentVel = this.rigidBody.linvel();
       
-      // Claw trails behind the body based on ACTUAL velocity, creating a straight rigid rod effect
       const trailVector = new THREE.Vector2(-currentVel.x, -currentVel.y);
       if (trailVector.length() > 0.1) {
         trailVector.normalize().multiplyScalar(5);
       } else {
         trailVector.set(0, 5); // Straight up if very slow
       }
-      this.clawPos.lerp(new THREE.Vector2(currentPos.x + trailVector.x, currentPos.y + trailVector.y), 0.3);
+      
+      // Smoothly interpolate claw towards trailing position instead of teleporting
+      const targetClawPos = new THREE.Vector2(currentPos.x + trailVector.x, currentPos.y + trailVector.y);
+      const diff = targetClawPos.sub(this.clawPos);
+      this.clawVelocity.add(diff.multiplyScalar(0.05));
+      this.clawVelocity.multiplyScalar(0.85); // damping
+      this.clawPos.add(this.clawVelocity);
       
       // Simple floor collision check
       // Body radius is 0.8. Floor top is -5. 
       if (currentPos.y <= -4.1) { // Hit floor
         this.isAttached = true;
         this.clawPos.set(currentPos.x, -5); // attach to floor top
-        // Prevent velocity spike on next frame
+        this.clawVelocity.set(0, 0);
         this.prevBodyPos.set(currentPos.x, currentPos.y);
       }
     }
 
     this.prevIsMouseDown = isMouseDown;
-
-    // Sync mesh
+    
+    // Sync body visual
     const pos = this.rigidBody.translation();
     this.bodyMesh.position.set(pos.x, pos.y, 0.2);
     this.clawMesh.position.set(this.clawPos.x, this.clawPos.y, 0.1);
@@ -132,35 +139,48 @@ export class RobotArm {
   private updateIK() {
     const base = new THREE.Vector2(this.bodyMesh.position.x, this.bodyMesh.position.y);
     const target = this.clawPos.clone();
-    const dist = base.distanceTo(target);
-    const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
+    const L = 2.5; // Fixed segment length
+    let dist = base.distanceTo(target);
+    const maxDist = 3 * L;
+
+    // Visually clamp claw if physics drift causes it to exceed max length
+    if (dist > maxDist) {
+      const dir = target.clone().sub(base).normalize();
+      target.copy(base.clone().add(dir.multiplyScalar(maxDist)));
+      dist = maxDist;
+    }
 
     this.joints[0].copy(base);
     this.joints[3].copy(target);
+
+    let dir = target.clone().sub(base);
+    if (dist < 0.001) {
+      dir.set(0, 1);
+      dist = 0.001;
+    } else {
+      dir.normalize();
+    }
 
     if (dist >= maxDist - 0.01) {
       // Straight line
       this.joints[1].lerpVectors(base, target, 1/3);
       this.joints[2].lerpVectors(base, target, 2/3);
     } else {
-      // Bezier curve for smooth bending
-      const mid = base.clone().add(target).multiplyScalar(0.5);
-      const dir = target.clone().sub(base).normalize();
-      const normal = new THREE.Vector2(-dir.y, dir.x);
+      // Exact 3-segment symmetric IK (Trapezoid folding)
+      const n = new THREE.Vector2(-dir.y, dir.x); 
       
-      // Curve height proportional to how compressed it is, reduced for flatter look
-      const height = Math.sqrt(maxDist * maxDist - dist * dist) * 0.25;
-      const control = mid.add(normal.multiplyScalar(height));
-
-      // Quadratic bezier sampling
-      for (let i = 1; i <= 2; i++) {
-        const t = i / 3.0;
-        const mt = 1 - t;
-        this.joints[i].set(
-          mt * mt * base.x + 2 * mt * t * control.x + t * t * target.x,
-          mt * mt * base.y + 2 * mt * t * control.y + t * t * target.y
-        );
-      }
+      // Calculate theta for symmetric folding
+      const cosTheta = Math.max(-1, Math.min(1, (dist - L) / (2 * L)));
+      const theta = Math.acos(cosTheta);
+      
+      this.joints[1].set(
+        base.x + L * (dir.x * Math.cos(theta) + n.x * Math.sin(theta)),
+        base.y + L * (dir.y * Math.cos(theta) + n.y * Math.sin(theta))
+      );
+      this.joints[2].set(
+        target.x - L * dir.x * Math.cos(theta) + L * n.x * Math.sin(theta),
+        target.y - L * dir.y * Math.cos(theta) + L * n.y * Math.sin(theta)
+      );
     }
 
     // Update visuals
@@ -169,7 +189,7 @@ export class RobotArm {
       const end = this.joints[i+1];
       
       this.armMeshes[i].position.set(start.x, start.y, 0.15);
-      this.armMeshes[i].scale.y = start.distanceTo(end);
+      this.armMeshes[i].scale.y = L; // Constant length!
       this.armMeshes[i].rotation.z = Math.atan2(end.y - start.y, end.x - start.x) - Math.PI / 2;
       
       if (i < 2) {

@@ -241,10 +241,10 @@ class Game {
     this.robotArm.update(this.mousePos, this.isMouseDown);
     this.levelManager.update(deltaTime);
 
-    // Camera follow
-    const clawPos = this.robotArm.clawPos;
-    this.camera.position.x += (clawPos.x - this.camera.position.x) * 0.1;
-    this.camera.position.y += (clawPos.y - this.camera.position.y) * 0.1;
+    // Camera follow (Body)
+    const bodyPos = this.robotArm.bodyMesh.position;
+    this.camera.position.x += (bodyPos.x - this.camera.position.x) * 0.1;
+    this.camera.position.y += (bodyPos.y - this.camera.position.y) * 0.1;
     this.camera.lookAt(this.camera.position.x, this.camera.position.y, 0);
 
     // Render
