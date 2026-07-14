@@ -6,7 +6,7 @@ import { LevelManager } from './LevelManager';
 import { LightingSystem } from './LightingSystem';
 import { Vec2 } from './Vec2';
 import * as RAPIER from '@dimforge/rapier2d';
-import { PixelateFilter, AdvancedBloomFilter } from 'pixi-filters';
+import { PixelateFilter, AdvancedBloomFilter, GodrayFilter, AdjustmentFilter } from 'pixi-filters';
 
 // Fetch and display version
 fetch('/version.json')
@@ -42,6 +42,7 @@ class Game {
   private isMouseDown = false;
   private mousePos = new Vec2();
   private cameraPos = new Vec2(0, 0);
+  private godrayFilter!: GodrayFilter;
 
   constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
@@ -54,33 +55,46 @@ class Game {
     this.app = new PIXI.Application();
     
     // Pixel Art settings
-    PIXI.AbstractRenderer.defaultOptions.resolution = 0.5; // Downsample for pixel effect
     PIXI.AbstractRenderer.defaultOptions.roundPixels = true;
     PIXI.TextureStyle.defaultOptions.scaleMode = 'nearest';
 
     await this.app.init({ 
       width: window.innerWidth, 
       height: window.innerHeight, 
-      backgroundColor: 0x050510, // Dark night sky
+      backgroundColor: 0xff9955, // Sunset orange sky
       resizeTo: window,
-      antialias: false,
-      resolution: 0.5
+      antialias: false
     });
     
     const container = document.getElementById('game-container')!;
     container.innerHTML = ''; 
-    this.app.canvas.style.imageRendering = 'pixelated'; // CSS pixelation
     container.appendChild(this.app.canvas);
+
+    this.godrayFilter = new GodrayFilter({
+        alpha: 0.4,
+        angle: -30,
+        parallel: true,
+        time: 0
+    });
+
+    const adjustmentFilter = new AdjustmentFilter({
+        gamma: 1.1,
+        contrast: 1.3,
+        saturation: 1.2,
+        brightness: 1.0
+    });
 
     // Apply high-quality post-processing shaders
     this.app.stage.filters = [
+      this.godrayFilter,
       new AdvancedBloomFilter({
-        threshold: 0.8,
-        bloomScale: 0.8,
+        threshold: 0.7,
+        bloomScale: 1.2,
         brightness: 1.0,
-        blur: 4,
+        blur: 6,
         quality: 4
       }),
+      adjustmentFilter,
       new PixelateFilter([3, 3])
     ];
 
@@ -88,6 +102,18 @@ class Game {
     this.app.stage.addChild(this.postProcessLayer);
 
     this.skyLayer = new PIXI.Container();
+    
+    // Draw a sunset Sun in the sky
+    const sun = new PIXI.Graphics();
+    sun.circle(0, 0, 100).fill({ color: 0xffeadd });
+    sun.position.set(window.innerWidth * 0.7, window.innerHeight * 0.4);
+    
+    // Add sun halo/glow
+    const sunGlow = new PIXI.Graphics();
+    sunGlow.circle(0, 0, 300).fill({ color: 0xff8833, alpha: 0.3 });
+    sun.addChild(sunGlow);
+    
+    this.skyLayer.addChild(sun);
     this.bgLayerFar = new PIXI.Container();
     this.bgLayerMid = new PIXI.Container();
     this.gameplayLayer = new PIXI.Container();
@@ -99,9 +125,9 @@ class Game {
     this.postProcessLayer.addChild(this.bgLayerMid);
     this.postProcessLayer.addChild(this.gameplayLayer);
     
-    // Dark Ambient Shadow
+    // Dark Ambient Shadow (Sunset Twilight)
     const shadowOverlay = new PIXI.Graphics();
-    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x0a0a1a, alpha: 0.9 }); // Very dark
+    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x4a2a4a, alpha: 0.75 }); // Purplish twilight
     this.shadowLayer.addChild(shadowOverlay);
     this.shadowLayer.blendMode = 'multiply';
     this.postProcessLayer.addChild(this.shadowLayer);
@@ -205,8 +231,13 @@ class Game {
     
     // (Filters are static now, no need to update CRT seeds)
 
-    // Update Dynamic Raycast Lighting
-    this.lightingSystem.update(this.robotArm.clawPos);
+    // Update Cinematic Shaders
+    this.godrayFilter.time += deltaMS / 1000;
+
+    // Update Dynamic Raycast Lighting (from a fixed position like the Sun)
+    // We simulate the sun being far away to the top right
+    const sunWorldPos = new Vec2(this.cameraPos.x + 30, this.cameraPos.y + 40);
+    this.lightingSystem.update(sunWorldPos);
 
     // Parallax Camera System
     const targetCamX = this.robotArm.clawPos.x;
