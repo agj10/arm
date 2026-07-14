@@ -32,7 +32,7 @@ export class LightingSystem {
     
     this.lightSprite = new PIXI.Sprite(PIXI.Texture.from(canvas));
     this.lightSprite.anchor.set(0.5);
-    this.lightSprite.scale.set(6.0);
+    this.lightSprite.scale.set(2.0); // Reduced scale for better look
     this.lightSprite.tint = 0xffeebb;
     this.lightSprite.blendMode = 'add';
     

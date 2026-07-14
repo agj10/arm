@@ -75,10 +75,10 @@ class Game {
     // Apply high-quality post-processing shaders
     this.app.stage.filters = [
       new AdvancedBloomFilter({
-        threshold: 0.6,
-        bloomScale: 1.2,
+        threshold: 0.8,
+        bloomScale: 0.8,
         brightness: 1.0,
-        blur: 8,
+        blur: 4,
         quality: 4
       }),
       new PixelateFilter([3, 3])
