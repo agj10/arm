@@ -5,7 +5,6 @@ export class LevelManager {
   private uiManager: UIManager;
   private robotArm: RobotArm;
   private state: 'FOREST' | 'FACTORY_ENTRANCE' | 'CONVEYOR' | 'TITLE' | 'DROP' | 'UNDERGROUND' = 'FOREST';
-  private timer: number = 0;
   private initDone: boolean = false;
 
   constructor(uiManager: UIManager, robotArm: RobotArm) {
@@ -13,7 +12,7 @@ export class LevelManager {
     this.robotArm = robotArm;
   }
 
-  public update(deltaTime: number) {
+  public update(_deltaTime: number) {
     const px = this.robotArm.clawPos.x;
     const py = this.robotArm.clawPos.y;
 

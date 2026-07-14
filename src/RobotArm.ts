@@ -150,7 +150,6 @@ export class RobotArm {
     
     // Hard-clamp clawPos to max length to prevent visual separation
     const base = new THREE.Vector2(pos.x, pos.y);
-    const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
     if (this.clawPos.distanceTo(base) > maxDist) {
       const dir = this.clawPos.clone().sub(base).normalize();
       this.clawPos.copy(base.clone().add(dir.multiplyScalar(maxDist)));
