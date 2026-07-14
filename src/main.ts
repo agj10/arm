@@ -70,12 +70,17 @@ class Game {
     container.innerHTML = ''; 
     container.appendChild(this.app.canvas);
 
+    this.app.stage.scale.set(0.5); // Zoom out 2x to widen FOV
+
     this.godrayFilter = new GodrayFilter({
-        alpha: 0.15, // Greatly reduced to prevent blinding
-        angle: -30,
-        parallel: true,
-        time: 0
+      alpha: 0.7,
+      angle: 30,
+      gain: 0.5,
+      lacunarity: 2.5,
+      time: 0
     });
+    this.godrayFilter.parallel = false;
+    this.godrayFilter.center = [this.app.screen.width / 2, this.app.screen.height / 2];
 
     const adjustmentFilter = new AdjustmentFilter({
         gamma: 1.0,
@@ -232,11 +237,8 @@ class Game {
     // (Filters are static now, no need to update CRT seeds)
 
     // Update Cinematic Shaders
-    this.godrayFilter.time += deltaMS / 1000;
-
-    // Update Dynamic Raycast Lighting (from a fixed position like the Sun)
-    // We simulate the sun being low on the horizon to the right for long shadows
-    const sunWorldPos = new Vec2(this.cameraPos.x + 60, this.cameraPos.y + 15);
+    // Center the sun in the screen to cast shadows radially outwards
+    const sunWorldPos = new Vec2(this.cameraPos.x, this.cameraPos.y);
     this.lightingSystem.update(sunWorldPos);
 
     // Parallax Camera System
@@ -244,12 +246,11 @@ class Game {
     const targetCamY = this.robotArm.clawPos.y;
     this.cameraPos.x += (targetCamX - this.cameraPos.x) * 5 * deltaTime;
     this.cameraPos.y += (targetCamY - this.cameraPos.y) * 5 * deltaTime;
-
+    
     const ppm = 40;
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
-
-    // 1:1 Gameplay Layer
+    const stageScale = 0.5;
+    const cx = (window.innerWidth / 2) / stageScale;
+    const cy = (window.innerHeight / 2) / stageScale;
     this.gameplayLayer.x = cx - this.cameraPos.x * ppm;
     this.gameplayLayer.y = cy - (-this.cameraPos.y * ppm);
 
