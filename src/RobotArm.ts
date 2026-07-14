@@ -62,7 +62,9 @@ export class RobotArm {
 
     const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -1);
     this.rigidBody = world.createRigidBody(rigidBodyDesc);
-    const colliderDesc = rapierModule.ColliderDesc.ball(0.8).setRestitution(0.2);
+    const colliderDesc = this.rapier.ColliderDesc.ball(0.8)
+      .setMass(2.0)
+      .setSensor(true); // Disable physical collision with environment
     world.createCollider(colliderDesc, this.rigidBody);
   }
 
