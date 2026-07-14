@@ -36,7 +36,7 @@ export class LightingSystem {
     this.lightTexture = PIXI.Texture.from(canvas);
 
     // Indices never change
-    const indices = new Uint16Array(this.rayCount * 3);
+    const indices = new Uint32Array(this.rayCount * 3);
     for (let i = 0; i < this.rayCount; i++) {
       indices[i * 3] = 0; // Center vertex
       indices[i * 3 + 1] = i + 1;
@@ -47,10 +47,11 @@ export class LightingSystem {
       const vertices = new Float32Array((this.rayCount + 1) * 2);
       const uvs = new Float32Array((this.rayCount + 1) * 2);
       
-      const geometry = new PIXI.Geometry();
-      geometry.addAttribute('aPosition', vertices, 2);
-      geometry.addAttribute('aUV', uvs, 2);
-      geometry.addIndex(indices);
+      const geometry = new PIXI.MeshGeometry({
+        positions: vertices,
+        uvs: uvs,
+        indices: indices
+      });
         
       const mesh = new PIXI.Mesh({ geometry, texture: this.lightTexture });
       
