@@ -1,7 +1,6 @@
 import * as PIXI from 'pixi.js';
 import * as RAPIER from '@dimforge/rapier2d';
 import { Vec2 } from './Vec2';
-import { PixelateFilter } from 'pixi-filters';
 
 export class LightingSystem {
   private world: RAPIER.World;
@@ -20,10 +19,9 @@ export class LightingSystem {
     this.rapier = rapierModule;
 
     this.lightContainer = new PIXI.Container();
-    // Force container to render offscreen and pixelate the entire lighting pass
+    // Force container to render offscreen and apply a soft blur for smooth shadows
     this.lightContainer.filters = [
-      new PIXI.AlphaFilter({ alpha: 1.0 }),
-      new PixelateFilter([3, 3])
+      new PIXI.BlurFilter(8)
     ];
     this.lightContainer.blendMode = 'add';
     

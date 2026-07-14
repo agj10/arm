@@ -137,22 +137,48 @@ export class RobotArm {
           const ray = new this.rapier.Ray({ x: this.clawPos.x, y: this.clawPos.y }, { x: dir.x, y: dir.y });
           const hit = this.world.castRay(ray, maxDist * 1.5, true, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
           
+          let hitPoint: Vec2;
           if (hit && !isNaN((hit as any).toi)) {
-            const hitPoint = new Vec2(
+            hitPoint = new Vec2(
               ray.origin.x + ray.dir.x * (hit as any).toi,
               ray.origin.y + ray.dir.y * (hit as any).toi
             );
-            this.isAttached = true;
-            this.clawPos.set(hitPoint.x, hitPoint.y);
-            this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
-            this.clawBody.setLinvel({ x: 0, y: 0 }, true);
-            this.clawBody.setAngvel(0, true);
+          } else {
+            // Mid-air snap swing! Attach to empty space if we missed a wall.
+            hitPoint = new Vec2(
+              ray.origin.x + ray.dir.x * maxDist * 1.5,
+              ray.origin.y + ray.dir.y * maxDist * 1.5
+            );
           }
+
+          this.isAttached = true;
+          this.clawPos.set(hitPoint.x, hitPoint.y);
+          this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
+          this.clawBody.setLinvel({ x: 0, y: 0 }, true);
+          this.clawBody.setAngvel(0, true);
         }
       }
       
-      // Auto-attach triggers (only for abyss)
-      if (bodyPos.y <= -1499.1 && bodyPos.x >= 150) { 
+      // Auto-attach on collision with any fixed geometry
+      const dirs = [{x:0,y:-0.7}, {x:0,y:0.7}, {x:-0.7,y:0}, {x:0.7,y:0}];
+      let touched = false;
+      for (const d of dirs) {
+        const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, d);
+        const hit = this.world.castRay(ray, 0.7, true, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
+        if (hit) {
+          touched = true;
+          break;
+        }
+      }
+
+      if (touched) { 
+        this.isAttached = true;
+        this.clawPos.set(cPos.x, cPos.y); 
+        this.clawBody.setTranslation({ x: cPos.x, y: cPos.y }, true);
+        this.clawBody.setLinvel({ x: 0, y: 0 }, true);
+        this.clawBody.setAngvel(0, true);
+      } else if (bodyPos.y <= -1499.1 && bodyPos.x >= 150) { 
+        // Abyss safety net
         this.isAttached = true;
         this.clawPos.set(bodyPos.x, -1500);
         this.clawBody.setTranslation({ x: bodyPos.x, y: -1500 }, true);
