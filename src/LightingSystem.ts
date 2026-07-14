@@ -9,24 +9,18 @@ export class LightingSystem {
   public lightContainer: PIXI.Container;
   private lightGraphics: PIXI.Graphics;
 
-  private rayCount: number = 720; // Maximum resolution for perfectly smooth edges
+  private rayCount: number = 720; // High resolution for perfectly smooth edges
   private maxDistance: number = 100; // In rapier units (meters)
-  private samples: number = 8; // Very smooth gradient stepping
-  private lightRadius: number = 0.3; // Small radius for sharp contact shadows
 
   constructor(world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.world = world;
     this.rapier = rapierModule;
 
     this.lightContainer = new PIXI.Container();
-    // Force container to render offscreen and apply a soft blur for smooth shadows
-    this.lightContainer.filters = [
-      new PIXI.BlurFilter(8)
-    ];
     this.lightContainer.blendMode = 'add';
     
     this.lightGraphics = new PIXI.Graphics();
-    this.lightGraphics.blendMode = 'normal'; // Drawn normally into the offscreen buffer
+    this.lightGraphics.blendMode = 'normal';
 
     this.lightContainer.addChild(this.lightGraphics);
   }
@@ -34,14 +28,18 @@ export class LightingSystem {
   public update(lightPos: Vec2) {
     this.lightGraphics.clear();
     
-    // Warm sunset orange, bright center
+    // Warm sunset orange
     const color = 0xffa050; 
-    const alpha = 0.08; // 8 samples * 0.08 = 0.64 total alpha
+    const alpha = 0.5; // Single point light
 
-    for (let s = 0; s < this.samples; s++) {
-      const sampleAngle = (s / this.samples) * Math.PI * 2;
-      const offsetX = Math.cos(sampleAngle) * this.lightRadius;
-      const offsetY = Math.sin(sampleAngle) * this.lightRadius;
+    // Only 1 sample for perfectly sharp shadows that match the square exactly
+    const samples = 1;
+    const lightRadius = 0;
+
+    for (let s = 0; s < samples; s++) {
+      const sampleAngle = (s / samples) * Math.PI * 2;
+      const offsetX = Math.cos(sampleAngle) * lightRadius;
+      const offsetY = Math.sin(sampleAngle) * lightRadius;
 
       const originX = lightPos.x + offsetX;
       const originY = lightPos.y + offsetY;
