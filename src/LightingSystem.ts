@@ -8,9 +8,10 @@ export class LightingSystem {
   
   public lightContainer: PIXI.Container;
   private lightGraphicsList: PIXI.Graphics[] = [];
+  private lightTexture: PIXI.Texture;
 
   private rayCount: number = 720; 
-  private maxDistance: number = 100;
+  private maxDistance: number = 50;
 
   constructor(world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.world = world;
@@ -19,6 +20,19 @@ export class LightingSystem {
     this.lightContainer = new PIXI.Container();
     this.lightContainer.blendMode = 'add';
     
+    // Create a 4096x4096 canvas (radius 2048) so that a maxDistance of 50m (2000px) NEVER reaches the edge, preventing tiling/flickering!
+    const canvas = document.createElement('canvas');
+    canvas.width = 4096;
+    canvas.height = 4096;
+    const ctx = canvas.getContext('2d')!;
+    const grd = ctx.createRadialGradient(2048, 2048, 0, 2048, 2048, 2048);
+    grd.addColorStop(0, "rgba(255, 170, 80, 0.12)"); // Bright center (low alpha for 8 layers)
+    grd.addColorStop(1, "rgba(255, 170, 80, 0.0)");  // Fade to completely transparent
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, 4096, 4096);
+    
+    this.lightTexture = PIXI.Texture.from(canvas);
+
     // Use an array of Graphics objects to correctly additively blend without path accumulation
     for (let i = 0; i < 8; i++) {
       const g = new PIXI.Graphics();
@@ -31,6 +45,9 @@ export class LightingSystem {
     const samples = 8;
     const lightRadius = 0.3; // Creates soft penumbra that blur over distance
     
+    const matrix = new PIXI.Matrix();
+    matrix.translate(lightPos.x * 40 - 2048, -lightPos.y * 40 - 2048);
+
     for (let s = 0; s < samples; s++) {
       const g = this.lightGraphicsList[s];
       g.clear();
@@ -66,8 +83,8 @@ export class LightingSystem {
         points.push({ x: hitX * 40, y: -hitY * 40 });
       }
 
-      // Draw the polygon natively filled with a solid color and low alpha for soft blending
-      g.poly(points).fill({ color: 0xffa050, alpha: 0.08 });
+      // Draw the polygon natively filled with the gradient texture
+      g.poly(points).fill({ texture: this.lightTexture, matrix: matrix });
     }
   }
 }
