@@ -36,6 +36,7 @@ class Game {
 
   // Input & State
   private isMouseDown = false;
+  private hasMouseMoved = false;
   private mouse = new THREE.Vector2();
   private mousePos = new THREE.Vector2();
   private lastTime = 0;
@@ -151,16 +152,9 @@ class Game {
     
     // Mouse events
     window.addEventListener('mousemove', (e) => {
-      const vec = new THREE.Vector3(
-        (e.clientX / window.innerWidth) * 2 - 1,
-        -(e.clientY / window.innerHeight) * 2 + 1,
-        0.5
-      );
-      vec.unproject(this.camera);
-      const dir = vec.sub(this.camera.position).normalize();
-      const distance = -this.camera.position.z / dir.z;
-      const pos = this.camera.position.clone().add(dir.multiplyScalar(distance));
-      this.mousePos.set(pos.x, pos.y);
+      this.hasMouseMoved = true;
+      this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
     });
     window.addEventListener('mousedown', () => this.isMouseDown = true);
     window.addEventListener('mouseup', () => this.isMouseDown = false);
@@ -230,8 +224,12 @@ class Game {
 
   private animate(time: number = 0) {
     requestAnimationFrame(this.animate.bind(this));
-    
-    this.updateMouseWorldPos(); // Always keep world mouse pos updated
+    if (!this.hasMouseMoved) {
+      // Fake a mouse position straight up so the body hangs straight down
+      this.mousePos.set(this.robotArm.clawPos.x, this.robotArm.clawPos.y + 4.5);
+    } else {
+      this.updateMouseWorldPos(); 
+    }
 
     const deltaTime = Math.min((time - this.lastTime) / 1000, 0.1);
     this.lastTime = time;
