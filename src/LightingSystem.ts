@@ -30,7 +30,14 @@ export class LightingSystem {
     grd.addColorStop(1, "rgba(255, 160, 80, 0.0)"); // Fades out completely at 512px
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, 1024, 1024);
+    
     this.gradientTexture = PIXI.Texture.from(canvas);
+    // Prevent the texture from tiling/repeating across the sky (which causes flashing when moving)
+    if (this.gradientTexture.source && this.gradientTexture.source.style) {
+        this.gradientTexture.source.style.addressMode = 'clamp-to-edge';
+        this.gradientTexture.source.style.addressModeU = 'clamp-to-edge';
+        this.gradientTexture.source.style.addressModeV = 'clamp-to-edge';
+    }
 
     this.lightGraphics = new PIXI.Graphics();
     this.lightContainer.addChild(this.lightGraphics);
@@ -79,7 +86,7 @@ export class LightingSystem {
       matrix.translate(originX * 40 - 512, -originY * 40 - 512);
       this.lightGraphics.poly(points).fill({ 
         texture: this.gradientTexture, 
-        alpha: 0.12, 
+        alpha: 0.045, // 0.045 * 8 samples = 0.36 max alpha (matches the soft orange look from a1.59!)
         matrix: matrix 
       });
     }
