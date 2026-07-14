@@ -26,7 +26,7 @@ export class LightingSystem {
     canvas.height = 512;
     const ctx = canvas.getContext('2d')!;
     const grd = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
-    grd.addColorStop(0, "rgba(255, 160, 80, 0.8)"); // Warm orange, bright center
+    grd.addColorStop(0, "rgba(255, 160, 80, 0.35)"); // Softer orange, matches previous look
     grd.addColorStop(1, "rgba(255, 160, 80, 0.0)"); // Fades out
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, 512, 512);
