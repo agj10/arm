@@ -55,9 +55,10 @@ export class RobotArm {
   }
 
   public update(mousePos: THREE.Vector2, isMouseDown: boolean) {
-    if (!isMouseDown) {
-      // Just a placeholder to use isMouseDown, actual attachment logic needed later
-      // this.clawPos.y -= 0.1; 
+    if (isMouseDown) {
+      // Placeholder: Drag the claw towards mouse to allow player movement right/left
+      this.clawPos.x += (mousePos.x - this.clawPos.x) * 0.1;
+      this.clawPos.y += (mousePos.y - this.clawPos.y) * 0.1;
     }
     // 1. Calculate Target Position (Point Symmetric to Claw)
     const targetX = this.clawPos.x - (mousePos.x - this.clawPos.x);

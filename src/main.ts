@@ -120,7 +120,7 @@ class Game {
           vec2 center = vec2(0.5, 0.5);
           vec2 d = vUv - center;
           float dist = length(d);
-          vec2 dir = normalize(d);
+          vec2 dir = dist > 0.0 ? d / dist : vec2(0.0);
           float offset = amount * dist * dist;
           vec4 cr = texture2D(tDiffuse, vUv + dir * offset);
           vec4 cga = texture2D(tDiffuse, vUv);
