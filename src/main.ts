@@ -101,17 +101,9 @@ class Game {
 
     // Dappled Shadow Setup (Multiply Blend Mode)
     const shadowOverlay = new PIXI.Graphics();
-    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x223355, alpha: 0.8 });
+    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x223355, alpha: 0.3 }); // Lighter overall shadow
     this.shadowLayer.addChild(shadowOverlay);
     this.shadowLayer.blendMode = 'multiply';
-
-    // Punch holes in the shadow (Erase Blend Mode)
-    for(let i=0; i<300; i++) {
-        const hole = new PIXI.Graphics();
-        hole.circle(Math.random() * 8000 - 1000, Math.random() * 1000 - 500, Math.random() * 60 + 20).fill({color: 0xffffff, alpha: 1.0});
-        hole.blendMode = 'erase';
-        this.shadowLayer.addChild(hole);
-    }
 
     // Physics World
     const gravity = { x: 0.0, y: -30.0 };
@@ -165,7 +157,7 @@ class Game {
     f2Vis.position.set(550 * 40, 1510 * 40);
     this.gameplayLayer.addChild(f2Vis);
 
-    // Swing Blocks
+    // Swing Blocks with Static Shadows
     for (let i = 0; i < 5; i++) {
       const bx = 10 + i * 20;
       const by = 4 + (i % 2) * 5;
@@ -173,6 +165,13 @@ class Game {
       const blockBody = this.world.createRigidBody(blockBodyDesc);
       this.world.createCollider(this.rapier.ColliderDesc.cuboid(2, 2), blockBody);
       
+      // Shadow (skewed and offset)
+      const bShadow = new PIXI.Graphics();
+      bShadow.rect(-2 * 40, -2 * 40, 4 * 40, 4 * 40).fill({ color: 0x000000, alpha: 0.5 });
+      bShadow.position.set(bx * 40 + 20, -by * 40 + 20); // Offset down-right
+      bShadow.skew.x = 0.3; // Skew away from light
+      this.gameplayLayer.addChild(bShadow);
+
       const bVis = new PIXI.Graphics();
       bVis.rect(-2 * 40, -2 * 40, 4 * 40, 4 * 40).fill(0x665544);
       bVis.position.set(bx * 40, -by * 40); // Pixi Y is inverted

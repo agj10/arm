@@ -12,6 +12,9 @@ export class RobotArm {
   private joints: Vec2[] = [];
   private armLengths: number[] = [2.5, 2.5, 2.5];
 
+  private shadowBody: PIXI.Graphics;
+  private shadowClaw: PIXI.Graphics;
+
   public clawPos: Vec2;
   private rigidBody: RAPIER.RigidBody;
   private clawBody: RAPIER.RigidBody;
@@ -29,9 +32,36 @@ export class RobotArm {
     this.world = world;
     this.clawPos = new Vec2(0, -5);
 
+    // Body
+    const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -1);
+    this.rigidBody = world.createRigidBody(rigidBodyDesc);
+    const colliderDesc = rapierModule.ColliderDesc.ball(0.8)
+      .setMass(2.0)
+      .setSensor(true);
+    world.createCollider(colliderDesc, this.rigidBody);
+
+    // Body Shadow
+    this.shadowBody = new PIXI.Graphics();
+    this.shadowBody.circle(0, 0, 0.8 * 40).fill({ color: 0x000000, alpha: 0.5 });
+    this.shadowBody.skew.x = 0.3;
+    container.addChild(this.shadowBody);
+
     this.bodyMesh = new PIXI.Graphics();
     this.bodyMesh.circle(0, 0, 0.8 * 40).fill(0x4a4a4a);
     container.addChild(this.bodyMesh);
+
+    // Claw
+    const clawBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -5).setLinearDamping(0.5);
+    this.clawBody = world.createRigidBody(clawBodyDesc);
+    const clawColDesc = rapierModule.ColliderDesc.cuboid(0.6, 0.6)
+      .setMass(0.5); // Lighter claw
+    world.createCollider(clawColDesc, this.clawBody);
+
+    // Claw Shadow
+    this.shadowClaw = new PIXI.Graphics();
+    this.shadowClaw.rect(-0.6 * 40, -0.6 * 40, 1.2 * 40, 1.2 * 40).fill({ color: 0x000000, alpha: 0.5 });
+    this.shadowClaw.skew.x = 0.3;
+    container.addChild(this.shadowClaw);
 
     this.clawMesh = new PIXI.Graphics();
     this.clawMesh.rect(-0.6 * 40, -0.6 * 40, 1.2 * 40, 1.2 * 40).fill(0x8b5a2b);
@@ -145,7 +175,10 @@ export class RobotArm {
     // Update visuals
     const pos = this.rigidBody.translation();
     this.bodyMesh.position.set(pos.x * 40, -pos.y * 40); 
+    this.shadowBody.position.set(pos.x * 40 + 20, -pos.y * 40 + 20);
+
     this.clawMesh.position.set(this.clawPos.x * 40, -this.clawPos.y * 40);
+    this.shadowClaw.position.set(this.clawPos.x * 40 + 20, -this.clawPos.y * 40 + 20);
 
     this.updateIK();
   }
