@@ -10,10 +10,10 @@ export class LightingSystem {
   public lightContainer: PIXI.Container;
   private lightGraphics: PIXI.Graphics;
 
-  private rayCount: number = 360; // High resolution for smooth circle edges
+  private rayCount: number = 720; // Maximum resolution for perfectly smooth edges
   private maxDistance: number = 100; // In rapier units (meters)
-  private samples: number = 3; // Stepped banding
-  private lightRadius: number = 1.5; // Area light radius
+  private samples: number = 8; // Very smooth gradient stepping
+  private lightRadius: number = 0.3; // Small radius for sharp contact shadows
 
   constructor(world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.world = world;
@@ -38,7 +38,7 @@ export class LightingSystem {
     
     // Warm sunset orange, bright center
     const color = 0xffa050; 
-    const alpha = 0.15; // Stronger orange per step
+    const alpha = 0.08; // 8 samples * 0.08 = 0.64 total alpha
 
     for (let s = 0; s < this.samples; s++) {
       const sampleAngle = (s / this.samples) * Math.PI * 2;

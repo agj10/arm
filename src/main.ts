@@ -235,8 +235,8 @@ class Game {
     this.godrayFilter.time += deltaMS / 1000;
 
     // Update Dynamic Raycast Lighting (from a fixed position like the Sun)
-    // We simulate the sun being far away to the top right
-    const sunWorldPos = new Vec2(this.cameraPos.x + 30, this.cameraPos.y + 40);
+    // We simulate the sun being low on the horizon to the right for long shadows
+    const sunWorldPos = new Vec2(this.cameraPos.x + 60, this.cameraPos.y + 15);
     this.lightingSystem.update(sunWorldPos);
 
     // Parallax Camera System
