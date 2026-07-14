@@ -158,8 +158,11 @@ class Game {
     window.addEventListener('mousemove', (e) => {
       const cx = window.innerWidth / 2;
       const cy = window.innerHeight / 2;
-      const worldX = (e.clientX - cx) / 40 + this.cameraPos.x;
-      const worldY = -(e.clientY - cy) / 40 + this.cameraPos.y; 
+      const stageScale = 0.5;
+      const ppm = 40;
+      // Convert screen pixels to world units, accounting for stage scale
+      const worldX = (e.clientX - cx) / (ppm * stageScale) + this.cameraPos.x;
+      const worldY = -(e.clientY - cy) / (ppm * stageScale) + this.cameraPos.y; 
       
       this.mousePos.x = worldX;
       this.mousePos.y = worldY;
@@ -243,7 +246,9 @@ class Game {
 
     // Parallax Camera System
     const targetCamX = this.robotArm.clawPos.x;
-    const targetCamY = this.robotArm.clawPos.y;
+    // Look 12 units ABOVE the claw, so the claw is at the bottom of the screen
+    // This places the sun (camera center) high in the sky to cast shadows downwards!
+    const targetCamY = this.robotArm.clawPos.y + 12; 
     this.cameraPos.x += (targetCamX - this.cameraPos.x) * 5 * deltaTime;
     this.cameraPos.y += (targetCamY - this.cameraPos.y) * 5 * deltaTime;
     
