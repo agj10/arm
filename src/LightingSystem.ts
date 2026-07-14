@@ -10,9 +10,9 @@ export class LightingSystem {
   public lightContainer: PIXI.Container;
   private lightGraphics: PIXI.Graphics;
 
-  private rayCount: number = 180; // Optimized for performance
+  private rayCount: number = 360; // High resolution for smooth circle edges
   private maxDistance: number = 100; // In rapier units (meters)
-  private samples: number = 4; // Stepped banding
+  private samples: number = 3; // Stepped banding
   private lightRadius: number = 1.5; // Area light radius
 
   constructor(world: RAPIER.World, rapierModule: typeof RAPIER) {
@@ -33,7 +33,7 @@ export class LightingSystem {
     this.lightContainer.addChild(this.lightGraphics);
   }
 
-  public update(lightPos: Vec2, cameraPos: Vec2) {
+  public update(lightPos: Vec2) {
     this.lightGraphics.clear();
     
     // Warm sunset orange, bright center

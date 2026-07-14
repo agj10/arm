@@ -237,7 +237,7 @@ class Game {
     // Update Dynamic Raycast Lighting (from a fixed position like the Sun)
     // We simulate the sun being far away to the top right
     const sunWorldPos = new Vec2(this.cameraPos.x + 30, this.cameraPos.y + 40);
-    this.lightingSystem.update(sunWorldPos, this.cameraPos);
+    this.lightingSystem.update(sunWorldPos);
 
     // Parallax Camera System
     const targetCamX = this.robotArm.clawPos.x;

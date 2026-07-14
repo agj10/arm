@@ -64,7 +64,7 @@ export class RobotArm {
 
       const armBodyDesc = rapierModule.RigidBodyDesc.kinematicPositionBased();
       const armBody = world.createRigidBody(armBodyDesc);
-      const armColDesc = rapierModule.ColliderDesc.cuboid(0.25, 0.5);
+      const armColDesc = rapierModule.ColliderDesc.cuboid(0.25, 1.25);
       world.createCollider(armColDesc, armBody);
       this.armBodies.push(armBody);
     }
@@ -217,11 +217,15 @@ export class RobotArm {
       const cy = (start.y + end.y) / 2;
       
       this.armMeshes[i].position.set(start.x * 40, -start.y * 40);
-      const angle = Math.atan2(end.y - start.y, end.x - start.x);
-      this.armMeshes[i].rotation = angle - Math.PI / 2;
+      this.armMeshes[i].scale.set(1, L);
+      
+      const physicalAngle = Math.atan2(end.y - start.y, end.x - start.x);
+      const visualAngle = Math.atan2(-end.y - (-start.y), end.x - start.x);
+      
+      this.armMeshes[i].rotation = visualAngle - Math.PI / 2;
       
       this.armBodies[i].setTranslation({ x: cx, y: cy }, true);
-      this.armBodies[i].setRotation(angle - Math.PI / 2, true);
+      this.armBodies[i].setRotation(physicalAngle - Math.PI / 2, true);
 
       if (i < 2) {
         this.jointMeshes[i].position.set(end.x * 40, -end.y * 40);
