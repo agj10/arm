@@ -43,7 +43,6 @@ class Game {
   private mousePos = new Vec2();
   private cameraPos = new Vec2(0, 0);
   private godrayFilter!: GodrayFilter;
-  private leafOverlay!: PIXI.TilingSprite;
 
   constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
