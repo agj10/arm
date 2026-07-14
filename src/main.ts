@@ -5,8 +5,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader.js';
-import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectionShader.js';
+import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { RobotArm } from './RobotArm';
 import { UIManager } from './UIManager';
 import { LevelManager } from './LevelManager';
@@ -33,6 +32,7 @@ class Game {
   private robotArm!: RobotArm;
   private uiManager: UIManager;
   private levelManager!: LevelManager;
+  private dirLight!: THREE.DirectionalLight;
 
   // Input & State
   private isMouseDown = false;
@@ -48,8 +48,8 @@ class Game {
     
     // Scene setup
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x2a3b4c);
-    this.scene.fog = new THREE.FogExp2(0x2a3b4c, 0.015);
+    this.scene.background = new THREE.Color(0x87ceeb); // Bright sky blue
+    this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.005);
 
     // Camera setup (2.5D perspective)
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -64,17 +64,20 @@ class Game {
     container.appendChild(this.renderer.domElement);
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    dirLight.position.set(10, 20, 10);
-    dirLight.castShadow = true;
-    dirLight.shadow.camera.top = 50;
-    dirLight.shadow.camera.bottom = -50;
-    dirLight.shadow.camera.left = -50;
-    dirLight.shadow.camera.right = 50;
-    this.scene.add(dirLight);
+    this.dirLight = new THREE.DirectionalLight(0xffffe0, 1.5);
+    this.dirLight.position.set(10, 30, 20);
+    this.dirLight.castShadow = true;
+    this.dirLight.shadow.camera.top = 100;
+    this.dirLight.shadow.camera.bottom = -100;
+    this.dirLight.shadow.camera.left = -100;
+    this.dirLight.shadow.camera.right = 100;
+    this.dirLight.shadow.mapSize.width = 2048;
+    this.dirLight.shadow.mapSize.height = 2048;
+    this.scene.add(this.dirLight);
+    this.scene.add(this.dirLight.target);
 
     // Post Processing
     this.composer = new EffectComposer(this.renderer);
@@ -82,57 +85,20 @@ class Game {
     const renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(renderPass);
 
-    // const ssaoPass = new SSAOPass(this.scene, this.camera, window.innerWidth, window.innerHeight);
-    // ssaoPass.kernelRadius = 16;
-    // ssaoPass.minDistance = 0.005;
-    // ssaoPass.maxDistance = 0.1;
-    // this.composer.addPass(ssaoPass);
-
     const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-    bloomPass.threshold = 0.2;
-    bloomPass.strength = 1.2;
+    bloomPass.threshold = 0.6;
+    bloomPass.strength = 0.5;
     bloomPass.radius = 0.5;
     this.composer.addPass(bloomPass);
 
-    const colorCorrectionPass = new ShaderPass(ColorCorrectionShader);
-    this.composer.addPass(colorCorrectionPass);
-
-    const vignettePass = new ShaderPass(VignetteShader);
-    vignettePass.uniforms["offset"].value = 1.0;
-    vignettePass.uniforms["darkness"].value = 0.8;
-    this.composer.addPass(vignettePass);
-
-    const RadialCA = {
-      uniforms: {
-        "tDiffuse": { value: null },
-        "amount": { value: 0.005 }
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D tDiffuse;
-        uniform float amount;
-        varying vec2 vUv;
-        void main() {
-          vec2 center = vec2(0.5, 0.5);
-          vec2 d = vUv - center;
-          float dist = length(d);
-          vec2 dir = dist > 0.0 ? d / dist : vec2(0.0);
-          float offset = amount * dist * dist;
-          vec4 cr = texture2D(tDiffuse, vUv + dir * offset);
-          vec4 cga = texture2D(tDiffuse, vUv);
-          vec4 cb = texture2D(tDiffuse, vUv - dir * offset);
-          gl_FragColor = vec4(cr.r, cga.g, cb.b, cga.a);
-        }
-      `
-    };
-    const caPass = new ShaderPass(RadialCA);
-    this.composer.addPass(caPass);
+    const bokehPass = new BokehPass(this.scene, this.camera, {
+      focus: 45.0,
+      aperture: 0.0001,
+      maxblur: 0.01,
+      width: window.innerWidth,
+      height: window.innerHeight
+    });
+    this.composer.addPass(bokehPass);
 
     // Physics World
     const gravity = { x: 0.0, y: -30.0 }; // Increased gravity
@@ -210,6 +176,27 @@ class Game {
       this.world.createCollider(blockColliderDesc, blockBody);
     }
     
+    // Trees
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3b2c, roughness: 1.0 });
+    const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d4c1e, roughness: 0.8 });
+    for (let i = 0; i < 10; i++) {
+      const tx = Math.random() * 120;
+      
+      const trunkGeo = new THREE.CylinderGeometry(0.5, 0.8, 5);
+      const trunkMesh = new THREE.Mesh(trunkGeo, trunkMat);
+      trunkMesh.position.set(tx, -2.5, -5 - Math.random() * 5);
+      trunkMesh.castShadow = true;
+      trunkMesh.receiveShadow = true;
+      this.scene.add(trunkMesh);
+      
+      const leavesGeo = new THREE.ConeGeometry(3, 8);
+      const leavesMesh = new THREE.Mesh(leavesGeo, leavesMat);
+      leavesMesh.position.set(tx, 4, trunkMesh.position.z);
+      leavesMesh.castShadow = true;
+      leavesMesh.receiveShadow = true;
+      this.scene.add(leavesMesh);
+    }
+    
     // Boundaries to prevent escaping
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 100), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-20, 30))); // Left
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 100), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(950, 30))); // Right
@@ -261,14 +248,19 @@ class Game {
     this.robotArm.update(this.mousePos, this.isMouseDown);
     this.levelManager.update(deltaTime);
 
-    // Camera follow (Body)
-    const bodyPos = this.robotArm.bodyMesh.position;
-    this.camera.position.x += (bodyPos.x - this.camera.position.x) * 0.1;
-    this.camera.position.y += (bodyPos.y - this.camera.position.y) * 0.1;
+    // Camera follow (Claw)
+    const clawPos = this.robotArm.clawPos;
+    this.camera.position.x += (clawPos.x - this.camera.position.x) * 0.1;
+    this.camera.position.y += (clawPos.y - this.camera.position.y) * 0.1;
     this.camera.lookAt(this.camera.position.x, this.camera.position.y, 0);
 
-    // Render
-    this.renderer.render(this.scene, this.camera);
+    // Light follow camera
+    this.dirLight.position.x = this.camera.position.x + 10;
+    this.dirLight.target.position.x = this.camera.position.x;
+    this.dirLight.target.updateMatrixWorld();
+
+    // Render using Composer!
+    this.composer.render();
   }
 }
 

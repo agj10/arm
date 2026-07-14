@@ -123,7 +123,10 @@ export class RobotArm {
         const hit = this.world.castRay(ray, maxToi, solid, this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC);
         
         if (hit) {
-          const hitPoint = ray.pointAt((hit as any).toi);
+          const hitPoint = new THREE.Vector2(
+            ray.origin.x + ray.dir.x * (hit as any).toi,
+            ray.origin.y + ray.dir.y * (hit as any).toi
+          );
           this.isAttached = true;
           this.clawPos.set(hitPoint.x, hitPoint.y);
           this.clawVelocity.set(0, 0);
