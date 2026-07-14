@@ -60,7 +60,8 @@ export class LightingSystem {
         );
 
         // Cast ray against ALL objects including player (so arm casts shadow!)
-        const hit = this.world.castRay(ray, this.maxDistance, true);
+        // solid = false: rays originating inside a collider ignore it and escape!
+        const hit = this.world.castRay(ray, this.maxDistance, false);
         
         let hitX, hitY;
         if (hit) {

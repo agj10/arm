@@ -36,8 +36,7 @@ export class RobotArm {
     const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -1);
     this.rigidBody = world.createRigidBody(rigidBodyDesc);
     const colliderDesc = rapierModule.ColliderDesc.ball(0.8)
-      .setMass(2.0)
-      .setSensor(true);
+      .setMass(2.0); // NOT a sensor! It will collide with the ground!
     world.createCollider(colliderDesc, this.rigidBody);
 
     this.bodyMesh = new PIXI.Graphics();
@@ -48,7 +47,7 @@ export class RobotArm {
     const clawBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -5).setLinearDamping(0.5);
     this.clawBody = world.createRigidBody(clawBodyDesc);
     const clawColDesc = rapierModule.ColliderDesc.cuboid(0.6, 0.6)
-      .setMass(0.5); // NOT a sensor, hits the ground
+      .setMass(0.5); // NOT a sensor
     world.createCollider(clawColDesc, this.clawBody);
 
     this.clawMesh = new PIXI.Graphics();
@@ -93,32 +92,37 @@ export class RobotArm {
     const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
 
     if (this.isAttached) {
-      this.rigidBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
       this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
+      this.clawBody.setTranslation({ x: this.clawPos.x, y: this.clawPos.y }, true);
 
-      // Slingshot logic: perfectly tight, no bouncing
-      let clampedMousePos = mousePos.clone();
-      if (clampedMousePos.distanceTo(this.clawPos) > maxDist) {
-        const dir = clampedMousePos.clone().sub(this.clawPos).normalize();
-        clampedMousePos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
+      if (isMouseDown) {
+        this.rigidBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
+        
+        let clampedMousePos = mousePos.clone();
+        if (clampedMousePos.distanceTo(this.clawPos) > maxDist) {
+          const dir = clampedMousePos.clone().sub(this.clawPos).normalize();
+          clampedMousePos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
+        }
+
+        // Base directly follows the mouse for perfect dragging
+        this.rigidBody.setTranslation({ x: clampedMousePos.x, y: clampedMousePos.y }, true);
+      } else {
+        // Base hangs freely
+        this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
       }
-
-      const targetX = this.clawPos.x - (clampedMousePos.x - this.clawPos.x);
-      const targetY = this.clawPos.y - (clampedMousePos.y - this.clawPos.y);
-
-      // Translate base directly to avoid spring bouncing
-      this.rigidBody.setTranslation({ x: targetX, y: targetY }, true);
 
       if (this.prevIsMouseDown && !isMouseDown) {
         this.isAttached = false;
-        this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
         this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
         
-        // Massive impulse to BOTH base and claw so they fly together naturally bent!
-        const pullX = this.clawPos.x - mousePos.x;
-        const pullY = this.clawPos.y - mousePos.y;
-        this.rigidBody.applyImpulse({ x: pullX * 250, y: pullY * 250 }, true);
-        this.clawBody.applyImpulse({ x: pullX * 50, y: pullY * 50 }, true);
+        // Massive velocity to BOTH base and claw!
+        const basePos = this.rigidBody.translation();
+        const pullX = this.clawPos.x - basePos.x;
+        const pullY = this.clawPos.y - basePos.y;
+        
+        // Set linear velocity to guarantee launch regardless of internal type-switch state
+        this.rigidBody.setLinvel({ x: pullX * 12, y: pullY * 12 }, true);
+        this.clawBody.setLinvel({ x: pullX * 12, y: pullY * 12 }, true);
       }
     } else {
       // Flying - Rapier Rope Joint automatically keeps them connected!
@@ -147,14 +151,8 @@ export class RobotArm {
         }
       }
       
-      // Auto-attach triggers
-      if (bodyPos.y <= -4.1 && bodyPos.x < 155) { 
-        this.isAttached = true;
-        this.clawPos.set(bodyPos.x, -5); 
-        this.clawBody.setTranslation({ x: bodyPos.x, y: -5 }, true);
-        this.clawBody.setLinvel({ x: 0, y: 0 }, true);
-        this.clawBody.setAngvel(0, true);
-      } else if (bodyPos.y <= -1499.1 && bodyPos.x >= 150) { 
+      // Auto-attach triggers (only for abyss)
+      if (bodyPos.y <= -1499.1 && bodyPos.x >= 150) { 
         this.isAttached = true;
         this.clawPos.set(bodyPos.x, -1500);
         this.clawBody.setTranslation({ x: bodyPos.x, y: -1500 }, true);
