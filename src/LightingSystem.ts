@@ -8,7 +8,6 @@ export class LightingSystem {
   
   public lightContainer: PIXI.Container;
   private lightGraphicsList: PIXI.Graphics[] = [];
-  private lightTexture: PIXI.Texture;
 
   private rayCount: number = 720; 
   private maxDistance: number = 100;
@@ -19,19 +18,6 @@ export class LightingSystem {
 
     this.lightContainer = new PIXI.Container();
     this.lightContainer.blendMode = 'add';
-    
-    // Create a smooth radial gradient texture
-    const canvas = document.createElement('canvas');
-    canvas.width = 2048;
-    canvas.height = 2048;
-    const ctx = canvas.getContext('2d')!;
-    const grd = ctx.createRadialGradient(1024, 1024, 0, 1024, 1024, 1024);
-    grd.addColorStop(0, "rgba(255, 160, 80, 0.15)"); // Low alpha because we layer 8 samples
-    grd.addColorStop(1, "rgba(255, 160, 80, 0.0)");
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, 2048, 2048);
-    
-    this.lightTexture = PIXI.Texture.from(canvas);
     
     // Use an array of Graphics objects to correctly additively blend without path accumulation
     for (let i = 0; i < 8; i++) {
@@ -45,9 +31,6 @@ export class LightingSystem {
     const samples = 8;
     const lightRadius = 0.3; // Creates soft penumbra that blur over distance
     
-    const matrix = new PIXI.Matrix();
-    matrix.translate(lightPos.x * 40 - 1024, -lightPos.y * 40 - 1024);
-
     for (let s = 0; s < samples; s++) {
       const g = this.lightGraphicsList[s];
       g.clear();
@@ -83,8 +66,8 @@ export class LightingSystem {
         points.push({ x: hitX * 40, y: -hitY * 40 });
       }
 
-      // Draw the polygon natively filled with the gradient texture
-      g.poly(points).fill({ texture: this.lightTexture, matrix: matrix });
+      // Draw the polygon natively filled with a solid color and low alpha for soft blending
+      g.poly(points).fill({ color: 0xffa050, alpha: 0.08 });
     }
   }
 }
