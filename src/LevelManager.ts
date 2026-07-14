@@ -17,21 +17,16 @@ export class LevelManager {
     const py = this.robotArm.clawPos.y;
 
     if (!this.initDone) {
-      this.uiManager.showAreaTitle('외진 숲');
       this.uiManager.showAreaTitle('Sector 00');
       this.initDone = true;
-      this.lastEventTime = currentTime;
     }
 
     switch (this.state) {
       case 'FOREST':
         if (px > 120) { 
-          if (currentTime - this.lastEventTime > 2) {
-            this.state = 'FACTORY_ENTRANCE';
-            this.uiManager.showAreaTitle('Sector 01');
-            this.uiManager.showSubtitle('SYSTEM ONLINE', true);
-            this.eventState = 1;
-          }
+          this.state = 'FACTORY_ENTRANCE';
+          this.uiManager.showAreaTitle('Sector 01');
+          this.uiManager.showSubtitle('SYSTEM ONLINE', true);
         }
         break;
       
