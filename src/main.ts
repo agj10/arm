@@ -181,31 +181,6 @@ class Game {
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-200, -500)));
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(4800, -500)));
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(0, 60)));
-
-    // Parallax Backgrounds
-    const farBg = new PIXI.Graphics();
-    farBg.rect(0, 0, 5000, 2000).fill(0x738473);
-    this.bgLayerFar.addChild(farBg);
-
-    for (let i = 0; i < 20; i++) {
-      const tx = i * 400 - 200;
-      const trunk = new PIXI.Graphics();
-      trunk.rect(-100, -2000, 200 + Math.random() * 100, 4000).fill(0x2a1b0a);
-      trunk.position.set(tx, 0);
-      this.bgLayerMid.addChild(trunk);
-    }
-
-    // Tree trunk physics colliders - cast shadows but don't block player movement
-    // Positioned BELOW the light source so sunlight filters down through gaps
-    for (let i = 0; i < 10; i++) {
-      const treeX = i * 12 - 10; // Wider spacing, spread across play area
-      const treeY = -2;          // Center below light (extends y=-10 to y=6, light is at y~7.5)
-      const treeBodyDesc = this.rapier.RigidBodyDesc.fixed().setTranslation(treeX, treeY);
-      const treeBody = this.world.createRigidBody(treeBodyDesc);
-      const treeColDesc = this.rapier.ColliderDesc.cuboid(0.8, 8) // Thinner trunks
-        .setCollisionGroups(0x00020000); // membership=2, filter=0 → won't collide with anything
-      this.world.createCollider(treeColDesc, treeBody);
-    }
   }
 
   private animate(deltaMS: number) {
