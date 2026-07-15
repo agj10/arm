@@ -90,76 +90,76 @@ export class RobotArm {
 
   public update(mousePos: Vec2, isMouseDown: boolean) {
     const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
+    const basePos = this.rigidBody.translation();
 
-    if (this.isAttached) {
-      this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
-      this.clawBody.setTranslation({ x: this.clawPos.x, y: this.clawPos.y }, true);
+    if (!isMouseDown) {
+      // Released - detach and follow mouse
+      this.isAttached = false;
+      this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
+      this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
 
-      // Inverted slingshot aiming: Base pulls back in the opposite direction of the mouse
-      this.rigidBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
-      
-      let clampedMousePos = mousePos.clone();
-      if (clampedMousePos.distanceTo(this.clawPos) > maxDist) {
-        const dir = clampedMousePos.clone().sub(this.clawPos).normalize();
-        clampedMousePos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
-      }
-      
-      // Base moves opposite to mouse, anchoring at clawPos
-      const targetX = this.clawPos.x - (clampedMousePos.x - this.clawPos.x);
-      const targetY = this.clawPos.y - (clampedMousePos.y - this.clawPos.y);
-
-      this.rigidBody.setTranslation({ x: targetX, y: targetY }, true);
-
-      if (this.prevIsMouseDown && !isMouseDown) {
-        // Released! Shoot towards the mouse!
-        this.isAttached = false;
-        this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
-        this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
-        
-        // Pull direction is from base towards claw (which is towards clampedMousePos)
-        const pullX = this.clawPos.x - targetX;
-        const pullY = this.clawPos.y - targetY;
-        
-        this.rigidBody.setLinvel({ x: pullX * 12, y: pullY * 12 }, true);
-        this.clawBody.setLinvel({ x: pullX * 12, y: pullY * 12 }, true);
-      }
-    } else {
-      // Flying - Rapier Rope Joint automatically keeps them connected!
-      const bodyPos = this.rigidBody.translation();
+      // Claw flies towards mouse cursor
       const cPos = this.clawBody.translation();
+      const targetPos = mousePos.clone();
+      const dir = targetPos.sub(new Vec2(cPos.x, cPos.y));
+      
+      // Proportional velocity to track mouse, gravity is handled naturally by physics
+      this.clawBody.setLinvel({ x: dir.x * 12, y: dir.y * 12 }, true);
+      
       this.clawPos.set(cPos.x, cPos.y);
-
-      // Auto-attach on collision with any fixed geometry, snapping exactly to surface
-      const dirs = [{x:0,y:-0.7}, {x:0,y:0.7}, {x:-0.7,y:0}, {x:0.7,y:0}];
-      let attachedPoint = null;
-      for (const d of dirs) {
-        const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, d);
-        // Exclude dynamic/kinematic so it only attaches to fixed level geometry
-        const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
-        const hit = this.world.castRay(ray, 0.7, true, filter);
-        if (hit) {
-          attachedPoint = new Vec2(
-            ray.origin.x + ray.dir.x * hit.timeOfImpact,
-            ray.origin.y + ray.dir.y * hit.timeOfImpact
-          );
-          break;
-        }
+    } else {
+      // Pressed - try to grapple!
+      if (!this.isAttached) {
+         // Aim towards mouse from base
+         const dir = mousePos.clone().sub(new Vec2(basePos.x, basePos.y));
+         const distToMouse = dir.length();
+         
+         if (distToMouse > 0.1) {
+            dir.normalize();
+            // Raycast to find the nearest solid surface in that direction
+            const ray = new this.rapier.Ray({ x: basePos.x, y: basePos.y }, { x: dir.x, y: dir.y });
+            const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
+            const hit = this.world.castRay(ray, maxDist, true, filter);
+            
+            if (hit) {
+                // Hit a surface! Attach the claw instantly.
+                this.isAttached = true;
+                const hitPoint = new Vec2(
+                    ray.origin.x + ray.dir.x * hit.timeOfImpact,
+                    ray.origin.y + ray.dir.y * hit.timeOfImpact
+                );
+                this.clawPos.copy(hitPoint);
+                this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
+                this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
+                this.clawBody.setLinvel({ x: 0, y: 0 }, true);
+            }
+         }
+         
+         // If still not attached (aimed at empty air), just act like released
+         if (!this.isAttached) {
+            this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
+            const cPos = this.clawBody.translation();
+            const targetPos = mousePos.clone();
+            const dir2 = targetPos.sub(new Vec2(cPos.x, cPos.y));
+            this.clawBody.setLinvel({ x: dir2.x * 12, y: dir2.y * 12 }, true);
+            this.clawPos.set(cPos.x, cPos.y);
+         }
       }
 
-      if (attachedPoint) { 
-        this.isAttached = true;
-        this.clawPos.set(attachedPoint.x, attachedPoint.y); 
-        this.clawBody.setTranslation({ x: attachedPoint.x, y: attachedPoint.y }, true);
-        this.clawBody.setLinvel({ x: 0, y: 0 }, true);
-        this.clawBody.setAngvel(0, true);
-      } else if (bodyPos.y <= -1499.1 && bodyPos.x >= 150) { 
-        // Abyss safety net
-        this.isAttached = true;
-        this.clawPos.set(bodyPos.x, -1500);
-        this.clawBody.setTranslation({ x: bodyPos.x, y: -1500 }, true);
-        this.clawBody.setLinvel({ x: 0, y: 0 }, true);
-        this.clawBody.setAngvel(0, true);
+      if (this.isAttached) {
+         // Swinging! The claw stays locked, the base swings freely.
+         this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
+         this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
+         this.clawBody.setTranslation({ x: this.clawPos.x, y: this.clawPos.y }, true);
       }
+    }
+
+    // Abyss safety net
+    if (basePos.y <= -1499.1 && basePos.x >= 150) { 
+      this.isAttached = true;
+      this.clawPos.set(basePos.x, -1500);
+      this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
+      this.clawBody.setTranslation({ x: basePos.x, y: -1500 }, true);
     }
 
     this.prevIsMouseDown = isMouseDown;
