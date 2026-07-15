@@ -184,7 +184,7 @@ class Game {
     // Floor
     const floorBodyDesc1 = this.rapier.RigidBodyDesc.fixed().setTranslation(0, -15);
     const floorBody1 = this.world.createRigidBody(floorBodyDesc1);
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5).setCollisionGroups(0x00010001), floorBody1);
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5).setCollisionGroups(0x0001000b), floorBody1);
     
     const f1Vis = new PIXI.Graphics();
     f1Vis.rect(-5000 * 40, -5 * 40, 10000 * 40, 10 * 40).fill(0x557755);
@@ -197,20 +197,20 @@ class Game {
     this.levelMaskContainer.addChild(f1Mask);
 
     // Walls
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000).setCollisionGroups(0x00010001), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-200, -500)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-200, -500)));
     const w1Mask = new PIXI.Graphics();
     w1Mask.rect(-5 * 40, -1000 * 40, 10 * 40, 2000 * 40).fill(0xffffff);
     w1Mask.position.set(-200 * 40, 500 * 40); // Y is flipped visually
     this.levelMaskContainer.addChild(w1Mask);
 
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000).setCollisionGroups(0x00010001), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(4800, -500)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(4800, -500)));
     const w2Mask = new PIXI.Graphics();
     w2Mask.rect(-5 * 40, -1000 * 40, 10 * 40, 2000 * 40).fill(0xffffff);
     w2Mask.position.set(4800 * 40, 500 * 40);
     this.levelMaskContainer.addChild(w2Mask);
 
     // Test Platform 1
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(10, 2).setCollisionGroups(0x00010001), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(30, 10)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(10, 2).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(30, 10)));
     const p1Vis = new PIXI.Graphics();
     p1Vis.rect(-10 * 40, -2 * 40, 20 * 40, 4 * 40).fill(0x775555);
     p1Vis.position.set(30 * 40, -10 * 40);
@@ -221,7 +221,7 @@ class Game {
     this.levelMaskContainer.addChild(p1Mask);
 
     // Test Platform 2 (Large Block)
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 15).setCollisionGroups(0x00010001), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(60, 5)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 15).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(60, 5)));
     const p2Vis = new PIXI.Graphics();
     p2Vis.rect(-5 * 40, -15 * 40, 10 * 40, 30 * 40).fill(0x555577);
     p2Vis.position.set(60 * 40, -5 * 40);
@@ -232,7 +232,7 @@ class Game {
     this.levelMaskContainer.addChild(p2Mask);
 
     // Test Platform 3 (Giant Ceiling Object)
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(40, 10).setCollisionGroups(0x00010001), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(120, 30)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(40, 10).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(120, 30)));
     const p3Vis = new PIXI.Graphics();
     p3Vis.rect(-40 * 40, -10 * 40, 80 * 40, 20 * 40).fill(0x444444);
     p3Vis.position.set(120 * 40, -30 * 40);
@@ -243,7 +243,7 @@ class Game {
     this.levelMaskContainer.addChild(p3Mask);
 
     // Ceiling
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5).setCollisionGroups(0x00010001), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(0, 60)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(0, 60)));
     const cMask = new PIXI.Graphics();
     cMask.rect(-5000 * 40, -5 * 40, 10000 * 40, 10 * 40).fill(0xffffff);
     cMask.position.set(0, -60 * 40);
