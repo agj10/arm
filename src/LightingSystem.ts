@@ -7,12 +7,11 @@ export class LightingSystem {
   private rapier: typeof RAPIER;
   
   public lightContainer: PIXI.Container;
-  private lightMeshes: PIXI.Mesh[] = [];
-  private lightGeometries: PIXI.Geometry[] = [];
-  private lightTexture: PIXI.Texture;
+  private lightSprite: PIXI.Sprite;
+  private visibilityMask: PIXI.Graphics;
 
-  private rayCount: number = 360; // 360 is plenty for smooth shadows
-  private maxDistance: number = 30; // 30m = 1200px, enough for screen
+  private rayCount: number = 360;
+  private maxDistance: number = 50; // In rapier units (meters)
 
   constructor(world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.world = world;
@@ -20,104 +19,76 @@ export class LightingSystem {
 
     this.lightContainer = new PIXI.Container();
     this.lightContainer.blendMode = 'add';
-    
-    // Create a smooth radial gradient texture
+
+    // Create a radial gradient for the light source
     const canvas = document.createElement('canvas');
-    const size = 2048;
-    canvas.width = size;
-    canvas.height = size;
+    canvas.width = 1024; canvas.height = 1024;
     const ctx = canvas.getContext('2d')!;
-    const grd = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-    // Soft warm gradient without a giant bright center
-    grd.addColorStop(0, "rgba(255, 170, 80, 0.15)");
-    grd.addColorStop(1, "rgba(255, 170, 80, 0.0)");
+    const grd = ctx.createRadialGradient(512, 512, 0, 512, 512, 512);
+    // Smooth warm orange glow
+    grd.addColorStop(0, 'rgba(255, 200, 100, 1.0)');
+    grd.addColorStop(0.5, 'rgba(255, 170, 80, 0.5)');
+    grd.addColorStop(1, 'rgba(255, 170, 80, 0)');
     ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, 1024, 1024);
     
-    this.lightTexture = PIXI.Texture.from(canvas);
+    this.lightSprite = new PIXI.Sprite(PIXI.Texture.from(canvas));
+    this.lightSprite.anchor.set(0.5);
+    this.lightSprite.scale.set(4.0); // Make it large enough
+    
+    this.visibilityMask = new PIXI.Graphics();
+    
+    // Apply BlurFilter to the mask to create shader-based soft shadows!
+    const blurFilter = new PIXI.BlurFilter({ strength: 16, quality: 4 });
+    this.visibilityMask.filters = [blurFilter];
+    
+    // Use the blurred graphics as an alpha mask for the light sprite
+    this.lightSprite.mask = this.visibilityMask;
 
-    // Indices never change
-    const indices = new Uint32Array(this.rayCount * 3);
-    for (let i = 0; i < this.rayCount; i++) {
-      indices[i * 3] = 0; // Center vertex
-      indices[i * 3 + 1] = i + 1;
-      indices[i * 3 + 2] = (i === this.rayCount - 1) ? 1 : i + 2;
-    }
-
-    // 8 layers for area light soft shadows
-    for (let i = 0; i < 8; i++) {
-      const vertices = new Float32Array((this.rayCount + 1) * 2);
-      const uvs = new Float32Array((this.rayCount + 1) * 2);
-      
-      const geometry = new PIXI.MeshGeometry({
-        positions: vertices,
-        uvs: uvs,
-        indices: indices
-      });
-        
-      const mesh = new PIXI.Mesh({ geometry, texture: this.lightTexture });
-      
-      this.lightGeometries.push(geometry);
-      this.lightMeshes.push(mesh);
-      this.lightContainer.addChild(mesh);
-    }
+    this.lightContainer.addChild(this.lightSprite);
+    this.lightContainer.addChild(this.visibilityMask);
   }
 
   public update(lightPos: Vec2) {
-    const samples = 8;
-    const lightRadius = 0.4; // Soft penumbra for large sun
-    const maxPixelDist = this.maxDistance * 40;
+    // Pixi positions
+    const pixiX = lightPos.x * 40;
+    const pixiY = -lightPos.y * 40;
+
+    this.lightSprite.position.set(pixiX, pixiY);
     
-    // Only exclude sensors (arm segment colliders) - let player body/claw cast shadows
+    this.visibilityMask.clear();
+    
     const filter = this.rapier.QueryFilterFlags.EXCLUDE_SENSORS;
+    const points: {x: number, y: number}[] = [];
+    
+    // Cast rays in 360 degrees
+    for (let i = 0; i < this.rayCount; i++) {
+      const angle = (i / this.rayCount) * Math.PI * 2;
+      const dir = { x: Math.cos(angle), y: Math.sin(angle) };
+      
+      const originX = lightPos.x;
+      const originY = lightPos.y;
 
-    for (let s = 0; s < samples; s++) {
-      const sampleAngle = (s / samples) * Math.PI * 2;
-      const offsetX = Math.cos(sampleAngle) * lightRadius;
-      const offsetY = Math.sin(sampleAngle) * lightRadius;
+      const ray = new this.rapier.Ray(
+        { x: originX, y: originY },
+        dir
+      );
 
-      const originX = lightPos.x + offsetX;
-      const originY = lightPos.y + offsetY;
-
-      const geom = this.lightGeometries[s];
-      const vertices = geom.getBuffer('aPosition').data as Float32Array;
-      const uvs = geom.getBuffer('aUV').data as Float32Array;
-
-      // Center vertex in world coordinates
-      vertices[0] = originX * 40;
-      vertices[1] = -originY * 40;
-      uvs[0] = 0.5;
-      uvs[1] = 0.5;
-
-      for (let i = 0; i < this.rayCount; i++) {
-        const angle = (i / this.rayCount) * Math.PI * 2;
-        const dir = { x: Math.cos(angle), y: Math.sin(angle) };
-        const ray = new this.rapier.Ray({ x: originX, y: originY }, dir);
-        const hit = this.world.castRay(ray, this.maxDistance, false, filter);
-
-        let hitDist = this.maxDistance;
-        if (hit) {
-          hitDist = hit.timeOfImpact;
-        }
-        
-        const hitX = originX + dir.x * hitDist;
-        const hitY = originY + dir.y * hitDist;
-
-        // Vertex positions (world space)
-        const vIdx = (i + 1) * 2;
-        vertices[vIdx] = hitX * 40;
-        vertices[vIdx + 1] = -hitY * 40;
-
-        // UV mapping relative to maxDistance
-        const localX = (hitX - originX) * 40;
-        const localY = (-hitY - (-originY)) * 40;
-        
-        uvs[vIdx] = 0.5 + (localX / maxPixelDist) * 0.5;
-        uvs[vIdx + 1] = 0.5 + (localY / maxPixelDist) * 0.5;
+      const hit = this.world.castRay(ray, this.maxDistance, false, filter);
+      
+      let hitX, hitY;
+      if (hit) {
+        hitX = originX + dir.x * hit.timeOfImpact;
+        hitY = originY + dir.y * hit.timeOfImpact;
+      } else {
+        hitX = originX + dir.x * this.maxDistance;
+        hitY = originY + dir.y * this.maxDistance;
       }
-
-      geom.getBuffer('aPosition').update();
-      geom.getBuffer('aUV').update();
+      
+      points.push({ x: hitX * 40, y: -hitY * 40 });
     }
+
+    // Draw visibility polygon and fill with white (the BlurFilter will soften its edges)
+    this.visibilityMask.poly(points).fill(0xffffff);
   }
 }
