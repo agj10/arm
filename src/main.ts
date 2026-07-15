@@ -83,13 +83,16 @@ class Game {
 
     // Volumetric Light Shafts (God Rays)
     this.godrayFilter = new GodrayFilter({
-      angle: 30,
+      angle: 30, // Unused when parallel is false
       gain: 0.5,
       lacunarity: 2.5,
       time: 0,
-      parallel: true,
-      center: [0, 0] // Will be updated to sun position if not parallel
+      parallel: false,
+      center: [0, 0] // Will be updated to sun position in animate()
     });
+
+    // Apply GodrayFilter ONLY to the lighting layer so shadows remain dark
+    this.lightingSystem.lightContainer.filters = [this.godrayFilter];
 
     // Apply cinematic post-processing to everything
     this.postProcessLayer = new PIXI.Container();
@@ -102,7 +105,6 @@ class Game {
         blur: 4,
         quality: 4
       }),
-      this.godrayFilter,
       adjustmentFilter
     ];
 
@@ -210,6 +212,11 @@ class Game {
     // Position the sun high in the sky (300 pixels above screen center)
     const sunWorldPos = new Vec2(this.cameraPos.x, this.cameraPos.y + 7.5);
     this.lightingSystem.update(sunWorldPos);
+
+    // Update GodrayFilter center to match sun screen position
+    const sunScreenX = this.app.screen.width / 2;
+    const sunScreenY = this.app.screen.height / 2 - 300 * this.app.stage.scale.y;
+    this.godrayFilter.center = [sunScreenX, sunScreenY];
 
     // Parallax Camera System
     const targetCamX = this.robotArm.clawPos.x;
