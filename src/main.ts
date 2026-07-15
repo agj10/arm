@@ -6,7 +6,7 @@ import { LevelManager } from './LevelManager';
 import { LightingSystem } from './LightingSystem';
 import { Vec2 } from './Vec2';
 import * as RAPIER from '@dimforge/rapier2d';
-import { GlowFilter, AdvancedBloomFilter, AdjustmentFilter } from 'pixi-filters';
+import { AdvancedBloomFilter, AdjustmentFilter, GlowFilter } from 'pixi-filters';
 
 // Fetch and display version
 fetch('/version.json')
@@ -37,19 +37,19 @@ class Game {
   private clawLayer!: PIXI.Container;
   private shadowLayer!: PIXI.Container;
   private lightLayer!: PIXI.Container;
-  private silhouetteLayer!: PIXI.Container;
-  private levelMaskContainer!: PIXI.Container;
-  private sunLayer!: PIXI.Container;
   private postProcessLayer!: PIXI.Container;
   
   private targetZoom: number = 1.0;
   private currentZoom: number = 1.0;
   
+  private silhouetteLayer!: PIXI.Container;
+  private levelMaskContainer!: PIXI.Container;
+
   // Input & State
   private isMouseDown = false;
   private mousePos = new Vec2();
   private cameraPos = new Vec2(0, 0);
-  private sunVisual!: PIXI.Graphics;
+  private sunVisual!: PIXI.Container;
 
   constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
@@ -100,6 +100,13 @@ class Game {
 
     this.skyLayer = new PIXI.Container();
     
+    const sun = new PIXI.Graphics();
+    sun.circle(0, 0, 150).fill({ color: 0xffaa55, alpha: 0.1 });
+    sun.circle(0, 0, 100).fill({ color: 0xffdd88, alpha: 0.3 });
+    sun.circle(0, 0, 60).fill({ color: 0xffffee });
+    this.skyLayer.addChild(sun);
+    this.sunVisual = sun;
+    
     this.bgLayerFar = new PIXI.Container();
     this.bgLayerMid = new PIXI.Container();
     this.gameplayLayer = new PIXI.Container();
@@ -115,64 +122,11 @@ class Game {
         new PIXI.AlphaFilter({ alpha: 0.12 })
     ];
 
-    this.sunLayer = new PIXI.Container();
-    
-    // Create the sun visual
-    this.sunVisual = new PIXI.Graphics();
-    
-    // Outer glow
-    this.sunVisual.circle(0, 0, 120).fill({ color: 0xffaa00, alpha: 0.2 });
-    this.sunVisual.circle(0, 0, 80).fill({ color: 0xffdd66, alpha: 0.4 });
-    // Core
-    this.sunVisual.circle(0, 0, 50).fill({ color: 0xffffff });
-    
-    // Depth of Field (Blur background layers)
-    this.bgLayerFar.filters = [new PIXI.BlurFilter({ strength: 4 })];
-    this.bgLayerMid.filters = [new PIXI.BlurFilter({ strength: 2 })];
-
-    this.sunVisual.position.set(35 * 40, 45 * 40);
-    this.sunLayer.addChild(this.sunVisual);
-
     this.postProcessLayer.addChild(this.skyLayer);
     this.postProcessLayer.addChild(this.bgLayerFar);
     this.postProcessLayer.addChild(this.bgLayerMid);
-    this.postProcessLayer.addChild(this.sunLayer);
     this.postProcessLayer.addChild(this.gameplayLayer);
     this.postProcessLayer.addChild(this.clawLayer);
-    
-    // Color Grading & Bloom
-    this.postProcessLayer.filters = [
-        new AdvancedBloomFilter({ threshold: 0.3, bloomScale: 1.2, brightness: 1.0, blur: 6 }),
-        new AdjustmentFilter({ gamma: 1.1, contrast: 1.2, saturation: 0.8, red: 0.9, green: 0.95, blue: 1.05 }) 
-    ];
-    
-    // Vignette Overlay (Screen Space)
-    const vignette = new PIXI.Sprite();
-    this.app.stage.addChild(vignette);
-    
-    // Update vignette on resize
-    const updateVignette = () => {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d')!;
-        const grad = ctx.createRadialGradient(256, 256, 100, 256, 256, 350);
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(0.5, 'rgba(0,0,0,0.2)');
-        grad.addColorStop(1, 'rgba(0,0,0,0.9)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 512, 512);
-        
-        vignette.texture = PIXI.Texture.from(canvas);
-        vignette.width = w;
-        vignette.height = h;
-    };
-    
-    window.addEventListener('resize', updateVignette);
-    updateVignette();
     
     // Add mask container to display tree so its world transforms are updated!
     // Since it's assigned as a mask, PixiJS will not render it to the color buffer.
@@ -259,39 +213,6 @@ class Game {
     w2Mask.position.set(4800 * 40, 500 * 40);
     this.levelMaskContainer.addChild(w2Mask);
 
-    // Test Platform 1
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(10, 2).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(30, 10)));
-    const p1Vis = new PIXI.Graphics();
-    p1Vis.rect(-10 * 40, -2 * 40, 20 * 40, 4 * 40).fill(0x775555);
-    p1Vis.position.set(30 * 40, -10 * 40);
-    this.gameplayLayer.addChild(p1Vis);
-    const p1Mask = new PIXI.Graphics();
-    p1Mask.rect(-10 * 40, -2 * 40, 20 * 40, 4 * 40).fill(0xffffff);
-    p1Mask.position.set(30 * 40, -10 * 40);
-    this.levelMaskContainer.addChild(p1Mask);
-
-    // Test Platform 2 (Large Block)
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 15).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(60, 5)));
-    const p2Vis = new PIXI.Graphics();
-    p2Vis.rect(-5 * 40, -15 * 40, 10 * 40, 30 * 40).fill(0x555577);
-    p2Vis.position.set(60 * 40, -5 * 40);
-    this.gameplayLayer.addChild(p2Vis);
-    const p2Mask = new PIXI.Graphics();
-    p2Mask.rect(-5 * 40, -15 * 40, 10 * 40, 30 * 40).fill(0xffffff);
-    p2Mask.position.set(60 * 40, -5 * 40);
-    this.levelMaskContainer.addChild(p2Mask);
-
-    // Test Platform 3 (Giant Ceiling Object)
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(40, 10).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(120, 30)));
-    const p3Vis = new PIXI.Graphics();
-    p3Vis.rect(-40 * 40, -10 * 40, 80 * 40, 20 * 40).fill(0x444444);
-    p3Vis.position.set(120 * 40, -30 * 40);
-    this.gameplayLayer.addChild(p3Vis);
-    const p3Mask = new PIXI.Graphics();
-    p3Mask.rect(-40 * 40, -10 * 40, 80 * 40, 20 * 40).fill(0xffffff);
-    p3Mask.position.set(120 * 40, -30 * 40);
-    this.levelMaskContainer.addChild(p3Mask);
-
     // Ceiling
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(0, 60)));
     const cMask = new PIXI.Graphics();
@@ -323,9 +244,11 @@ class Game {
     const cx = (window.innerWidth / 2) / stageScale;
     const cy = (window.innerHeight / 2) / stageScale;
 
+    this.sunVisual.position.set(cx, cy - 300);
+
     const layers = [
       this.gameplayLayer, this.clawLayer, this.shadowLayer, 
-      this.lightLayer, this.silhouetteLayer, this.levelMaskContainer, this.sunLayer
+      this.lightLayer, this.silhouetteLayer, this.levelMaskContainer
     ];
 
     layers.forEach(layer => {
