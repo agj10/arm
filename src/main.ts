@@ -6,7 +6,7 @@ import { LevelManager } from './LevelManager';
 import { LightingSystem } from './LightingSystem';
 import { Vec2 } from './Vec2';
 import * as RAPIER from '@dimforge/rapier2d';
-import { GlowFilter, GodrayFilter, AdvancedBloomFilter, AdjustmentFilter } from 'pixi-filters';
+import { GlowFilter, AdvancedBloomFilter, AdjustmentFilter } from 'pixi-filters';
 
 // Fetch and display version
 fetch('/version.json')
@@ -41,8 +41,6 @@ class Game {
   private levelMaskContainer!: PIXI.Container;
   private sunLayer!: PIXI.Container;
   private postProcessLayer!: PIXI.Container;
-  
-  private godrayFilter!: GodrayFilter;
   
   private targetZoom: number = 1.0;
   private currentZoom: number = 1.0;
@@ -128,10 +126,11 @@ class Game {
     // Core
     this.sunVisual.circle(0, 0, 50).fill({ color: 0xffffff });
     
+    // Depth of Field (Blur background layers)
+    this.bgLayerFar.filters = [new PIXI.BlurFilter({ strength: 4 })];
+    this.bgLayerMid.filters = [new PIXI.BlurFilter({ strength: 2 })];
+
     this.sunVisual.position.set(35 * 40, 45 * 40);
-    
-    this.godrayFilter = new GodrayFilter({ angle: 30, gain: 0.4, lacunarity: 2.5, time: 0 });
-    this.sunLayer.filters = [this.godrayFilter];
     this.sunLayer.addChild(this.sunVisual);
 
     this.postProcessLayer.addChild(this.skyLayer);
@@ -141,9 +140,39 @@ class Game {
     this.postProcessLayer.addChild(this.gameplayLayer);
     this.postProcessLayer.addChild(this.clawLayer);
     
+    // Color Grading & Bloom
     this.postProcessLayer.filters = [
-        new AdvancedBloomFilter({ threshold: 0.4, bloomScale: 1.0, brightness: 1.0, blur: 8 })
+        new AdvancedBloomFilter({ threshold: 0.3, bloomScale: 1.2, brightness: 1.0, blur: 6 }),
+        new AdjustmentFilter({ gamma: 1.1, contrast: 1.2, saturation: 0.8, red: 0.9, green: 0.95, blue: 1.05 }) 
     ];
+    
+    // Vignette Overlay (Screen Space)
+    const vignette = new PIXI.Sprite();
+    this.app.stage.addChild(vignette);
+    
+    // Update vignette on resize
+    const updateVignette = () => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d')!;
+        const grad = ctx.createRadialGradient(256, 256, 100, 256, 256, 350);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(0.5, 'rgba(0,0,0,0.2)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.9)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 512, 512);
+        
+        vignette.texture = PIXI.Texture.from(canvas);
+        vignette.width = w;
+        vignette.height = h;
+    };
+    
+    window.addEventListener('resize', updateVignette);
+    updateVignette();
     
     // Add mask container to display tree so its world transforms are updated!
     // Since it's assigned as a mask, PixiJS will not render it to the color buffer.
@@ -286,8 +315,6 @@ class Game {
     const targetCamY = this.robotArm.clawPos.y; 
     this.cameraPos.x += (targetCamX - this.cameraPos.x) * 5 * deltaTime;
     this.cameraPos.y += (targetCamY - this.cameraPos.y) * 5 * deltaTime;
-    
-    this.godrayFilter.time += deltaTime * 0.01;
     
     this.currentZoom += (this.targetZoom - this.currentZoom) * 0.1;
     const zoom = this.currentZoom;
