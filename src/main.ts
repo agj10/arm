@@ -114,6 +114,7 @@ class Game {
     this.silhouetteLayer = new PIXI.Container();
     this.levelMaskContainer = new PIXI.Container();
     this.silhouetteLayer.mask = this.levelMaskContainer;
+    this.silhouetteLayer.filters = [new PIXI.AlphaFilter({ alpha: 0.25 })];
 
     this.postProcessLayer.addChild(this.skyLayer);
     this.postProcessLayer.addChild(this.bgLayerFar);

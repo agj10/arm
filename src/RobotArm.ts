@@ -48,7 +48,7 @@ export class RobotArm {
     container.addChild(this.bodyMesh);
     
     this.silBodyMesh = new PIXI.Graphics();
-    this.silBodyMesh.circle(0, 0, 0.8 * 40).fill({color: 0x00ffff, alpha: 0.5});
+    this.silBodyMesh.circle(0, 0, 0.8 * 40).fill(0x00ffff);
     silhouetteContainer.addChild(this.silBodyMesh);
 
     // Claw
@@ -67,12 +67,12 @@ export class RobotArm {
 
     for (let i = 0; i < 3; i++) {
       const arm = new PIXI.Graphics();
-      arm.rect(-0.25 * 40, 0, 0.5 * 40, 1 * 40).fill(0x5a5a5a);
+      arm.rect(-0.25 * 40, -1.25 * 40, 0.5 * 40, 2.5 * 40).fill(0x5a5a5a);
       container.addChild(arm);
       this.armMeshes.push(arm);
       
       const silArm = new PIXI.Graphics();
-      silArm.rect(-0.25 * 40, 0, 0.5 * 40, 1 * 40).fill({color: 0x00ffff, alpha: 0.5});
+      silArm.rect(-0.25 * 40, -1.25 * 40, 0.5 * 40, 2.5 * 40).fill(0x00ffff);
       silhouetteContainer.addChild(silArm);
       this.silArmMeshes.push(silArm);
       
@@ -93,7 +93,7 @@ export class RobotArm {
       this.jointMeshes.push(jMesh);
       
       const silJMesh = new PIXI.Graphics();
-      silJMesh.circle(0, 0, 0.4 * 40).fill({color: 0x00ffff, alpha: 0.5});
+      silJMesh.circle(0, 0, 0.4 * 40).fill(0x00ffff);
       silhouetteContainer.addChild(silJMesh);
       this.silJointMeshes.push(silJMesh);
 
