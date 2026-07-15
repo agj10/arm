@@ -128,6 +128,7 @@ export class RobotArm {
           const cPos = this.clawBody.translation();
           const dirs = [{x:0,y:-1}, {x:0,y:1}, {x:-1,y:0}, {x:1,y:0}];
           let attachedPoint = null;
+          let attachedNormal = null;
           for (const d of dirs) {
             const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, d);
             const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
@@ -137,22 +138,32 @@ export class RobotArm {
                 ray.origin.x + ray.dir.x * hit.timeOfImpact,
                 ray.origin.y + ray.dir.y * hit.timeOfImpact
               );
+              attachedNormal = d;
               break;
             }
           }
 
-          if (attachedPoint) { 
+          if (attachedPoint && attachedNormal) { 
             this.isAttached = true;
             this.clawPos.set(attachedPoint.x, attachedPoint.y); 
             this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
             this.clawBody.setTranslation({ x: attachedPoint.x, y: attachedPoint.y }, true);
             this.clawBody.setLinvel({ x: 0, y: 0 }, true);
+            
+            const R = Math.atan2(-attachedNormal.y, attachedNormal.x) - Math.PI / 2;
+            this.clawBody.setRotation(-R, true);
           }
       }
       
       if (!this.isAttached) {
           const cPos = this.clawBody.translation();
           this.clawPos.set(cPos.x, cPos.y);
+          
+          const vel = this.clawBody.linvel();
+          if (Math.abs(vel.x) > 0.1 || Math.abs(vel.y) > 0.1) {
+              const R = Math.atan2(-vel.y, vel.x) - Math.PI / 2;
+              this.clawBody.setRotation(-R, true);
+          }
       }
     } else {
       // Attached state
