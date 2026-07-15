@@ -71,7 +71,7 @@ export class LightingSystem {
 
   public update(lightPos: Vec2) {
     const samples = 8;
-    const lightRadius = 0.4; // Soft penumbra for large sun
+    const lightRadius = 4.0; // Large area light to cast soft shadows and avoid occlusion shrinking
     const maxPixelDist = this.maxDistance * 40;
     
     // Only exclude sensors (arm segment colliders) - let player body/claw cast shadows

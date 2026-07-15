@@ -6,7 +6,7 @@ import { LevelManager } from './LevelManager';
 import { LightingSystem } from './LightingSystem';
 import { Vec2 } from './Vec2';
 import * as RAPIER from '@dimforge/rapier2d';
-import { AdvancedBloomFilter, AdjustmentFilter, GlowFilter } from 'pixi-filters';
+import { GlowFilter, GodrayFilter, AdvancedBloomFilter, AdjustmentFilter } from 'pixi-filters';
 
 // Fetch and display version
 fetch('/version.json')
@@ -41,6 +41,8 @@ class Game {
   private levelMaskContainer!: PIXI.Container;
   private sunLayer!: PIXI.Container;
   private postProcessLayer!: PIXI.Container;
+  
+  private godrayFilter!: GodrayFilter;
   
   private targetZoom: number = 1.0;
   private currentZoom: number = 1.0;
@@ -120,23 +122,16 @@ class Game {
     // Create the sun visual
     this.sunVisual = new PIXI.Graphics();
     
-    // Draw sunrays
-    for (let i = 0; i < 24; i++) {
-        const angle = (i / 24) * Math.PI * 2;
-        this.sunVisual.moveTo(Math.cos(angle) * 80, Math.sin(angle) * 80);
-        this.sunVisual.lineTo(Math.cos(angle) * 3000, Math.sin(angle) * 3000);
-    }
-    this.sunVisual.stroke({ color: 0xffeedd, width: 6, alpha: 0.1 });
-    
     // Outer glow
     this.sunVisual.circle(0, 0, 120).fill({ color: 0xffaa00, alpha: 0.2 });
     this.sunVisual.circle(0, 0, 80).fill({ color: 0xffdd66, alpha: 0.4 });
     // Core
     this.sunVisual.circle(0, 0, 50).fill({ color: 0xffffff });
     
-    // Position matches lightOrigin (35, -45) * 40
     this.sunVisual.position.set(35 * 40, 45 * 40);
     
+    this.godrayFilter = new GodrayFilter({ angle: 30, gain: 0.4, lacunarity: 2.5, time: 0 });
+    this.sunLayer.filters = [this.godrayFilter];
     this.sunLayer.addChild(this.sunVisual);
 
     this.postProcessLayer.addChild(this.skyLayer);
@@ -145,6 +140,10 @@ class Game {
     this.postProcessLayer.addChild(this.sunLayer);
     this.postProcessLayer.addChild(this.gameplayLayer);
     this.postProcessLayer.addChild(this.clawLayer);
+    
+    this.postProcessLayer.filters = [
+        new AdvancedBloomFilter({ threshold: 0.4, bloomScale: 1.0, brightness: 1.0, blur: 8 })
+    ];
     
     // Add mask container to display tree so its world transforms are updated!
     // Since it's assigned as a mask, PixiJS will not render it to the color buffer.
@@ -287,6 +286,8 @@ class Game {
     const targetCamY = this.robotArm.clawPos.y; 
     this.cameraPos.x += (targetCamX - this.cameraPos.x) * 5 * deltaTime;
     this.cameraPos.y += (targetCamY - this.cameraPos.y) * 5 * deltaTime;
+    
+    this.godrayFilter.time += deltaTime * 0.01;
     
     this.currentZoom += (this.targetZoom - this.currentZoom) * 0.1;
     const zoom = this.currentZoom;
