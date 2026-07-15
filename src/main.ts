@@ -106,6 +106,7 @@ class Game {
     this.bgLayerFar = new PIXI.Container();
     this.bgLayerMid = new PIXI.Container();
     this.gameplayLayer = new PIXI.Container();
+    this.clawLayer = new PIXI.Container();
     this.shadowLayer = new PIXI.Container();
     this.lightLayer = new PIXI.Container();
     
@@ -117,6 +118,11 @@ class Game {
     this.postProcessLayer.addChild(this.bgLayerFar);
     this.postProcessLayer.addChild(this.bgLayerMid);
     this.postProcessLayer.addChild(this.gameplayLayer);
+    this.postProcessLayer.addChild(this.clawLayer);
+    
+    // Add mask container to display tree so its world transforms are updated!
+    // Since it's assigned as a mask, PixiJS will not render it to the color buffer.
+    this.postProcessLayer.addChild(this.levelMaskContainer);
     
     const shadowOverlay = new PIXI.Graphics();
     shadowOverlay.rect(-50000, -50000, 100000, 100000).fill({ color: 0x221133, alpha: 0.45 });
@@ -135,7 +141,7 @@ class Game {
     this.postProcessLayer.addChild(this.silhouetteLayer);
 
     // Create Robot Arm
-    this.robotArm = new RobotArm(this.gameplayLayer, this.silhouetteLayer, this.world, this.rapier);
+    this.robotArm = new RobotArm(this.gameplayLayer, this.clawLayer, this.silhouetteLayer, this.world, this.rapier);
     
     this.levelManager = new LevelManager(this.uiManager, this.robotArm);
     this.createTestScene();
@@ -221,6 +227,8 @@ class Game {
 
     this.gameplayLayer.x = cx - this.cameraPos.x * ppm;
     this.gameplayLayer.y = cy - (-this.cameraPos.y * ppm);
+    this.clawLayer.x = this.gameplayLayer.x;
+    this.clawLayer.y = this.gameplayLayer.y;
 
     this.shadowLayer.x = this.gameplayLayer.x;
     this.shadowLayer.y = this.gameplayLayer.y;

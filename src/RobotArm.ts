@@ -9,7 +9,6 @@ export class RobotArm {
   private jointMeshes: PIXI.Graphics[] = [];
 
   public silBodyMesh: PIXI.Graphics;
-  public silClawMesh: PIXI.Graphics;
   private silArmMeshes: PIXI.Graphics[] = [];
   private silJointMeshes: PIXI.Graphics[] = [];
   
@@ -32,7 +31,7 @@ export class RobotArm {
   private rapier: typeof RAPIER;
   private world: RAPIER.World;
   
-  constructor(container: PIXI.Container, silhouetteContainer: PIXI.Container, world: RAPIER.World, rapierModule: typeof RAPIER) {
+  constructor(container: PIXI.Container, clawLayer: PIXI.Container, silhouetteContainer: PIXI.Container, world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
     this.world = world;
     this.clawPos = new Vec2(0, -5);
@@ -64,13 +63,7 @@ export class RobotArm {
     this.clawMesh.poly([-15, 0, -20, 25, -10, 25, -5, 0]).fill(0x5a5a5a);
     this.clawMesh.poly([15, 0, 20, 25, 10, 25, 5, 0]).fill(0x5a5a5a);
     this.clawMesh.circle(0, -5, 6).fill(0xee8822);
-    container.addChild(this.clawMesh);
-
-    this.silClawMesh = new PIXI.Graphics();
-    this.silClawMesh.roundRect(-15, -15, 30, 15, 4).fill({color: 0x00ffff, alpha: 0.5});
-    this.silClawMesh.poly([-15, 0, -20, 25, -10, 25, -5, 0]).fill({color: 0x00ffff, alpha: 0.5});
-    this.silClawMesh.poly([15, 0, 20, 25, 10, 25, 5, 0]).fill({color: 0x00ffff, alpha: 0.5});
-    silhouetteContainer.addChild(this.silClawMesh);
+    clawLayer.addChild(this.clawMesh);
 
     for (let i = 0; i < 3; i++) {
       const arm = new PIXI.Graphics();
@@ -189,7 +182,7 @@ export class RobotArm {
          }
          
          const baseVel = this.rigidBody.linvel();
-         const targetVx = (targetPos.x - basePos.x) * 12;
+         const targetVx = (targetPos.x - basePos.x) * 14;
          const targetVy = (targetPos.y - basePos.y) * 12;
          
          const lerpFactor = 0.2; 
@@ -219,8 +212,6 @@ export class RobotArm {
 
     this.clawMesh.position.set(this.clawPos.x * 40, -this.clawPos.y * 40);
     this.clawMesh.rotation = -this.clawBody.rotation();
-    this.silClawMesh.position.copyFrom(this.clawMesh.position);
-    this.silClawMesh.rotation = this.clawMesh.rotation;
 
     this.updateIK();
   }
