@@ -117,9 +117,7 @@ export class RobotArm {
       this.jointBodies.push(jointBody);
     }
 
-    // Rope constraint between base and claw
-    const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
-    const jointParams = rapierModule.JointData.rope(maxDist, {x:0, y:0}, {x:0, y:0});
+    // Rope constraint between base and claw removed
     // Rope joint removed so body movement doesn't affect claw swing
   }
 
@@ -180,7 +178,6 @@ export class RobotArm {
       }
     }
 
-    const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
     let targetPos = new Vec2(this.clawPos.x - (mousePos.x - this.clawPos.x), this.clawPos.y - (mousePos.y - this.clawPos.y));
     if (targetPos.distanceTo(this.clawPos) > maxDist) {
         const dir = targetPos.clone().sub(this.clawPos).normalize();
