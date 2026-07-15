@@ -28,9 +28,11 @@ export class LightingSystem {
     canvas.height = size;
     const ctx = canvas.getContext('2d')!;
     const grd = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-    // Soft warm gradient without a giant bright center
-    grd.addColorStop(0, "rgba(255, 170, 80, 0.15)");
-    grd.addColorStop(1, "rgba(255, 170, 80, 0.0)");
+    // Sharp bright core with a subtle atmospheric outer glow
+    // Alpha is multiplied by 8 layers, so 0.125 = 1.0 total alpha
+    grd.addColorStop(0, "rgba(255, 255, 230, 0.4)");    // Core (very bright white-yellow)
+    grd.addColorStop(0.1, "rgba(255, 200, 80, 0.05)");  // Halo (soft orange glow)
+    grd.addColorStop(1, "rgba(255, 120, 30, 0.0)");     // Fade out quickly
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, size, size);
     

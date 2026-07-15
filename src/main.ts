@@ -97,14 +97,9 @@ class Game {
     
     // Draw a sunset Sun in the sky
     const sun = new PIXI.Graphics();
-    sun.circle(0, 0, 100).fill({ color: 0xffeadd });
+    sun.circle(0, 0, 60).fill({ color: 0xffffee }); // Smaller, brighter core
     sun.position.set(window.innerWidth * 0.7, window.innerHeight * 0.7);
-    
-    // Add sun halo/glow
-    const sunGlow = new PIXI.Graphics();
-    sunGlow.circle(0, 0, 300).fill({ color: 0xffaa44, alpha: 0.35 });
-    sunGlow.filters = [new PIXI.BlurFilter(50)];
-    sun.addChild(sunGlow);
+    // Glow is handled by LightingSystem
     
     this.skyLayer.addChild(sun);
     this.sunVisual = sun;
