@@ -167,45 +167,20 @@ class Game {
   }
 
   private createTestScene() {
-    // 1. Forest Floor
-    const floorBodyDesc1 = this.rapier.RigidBodyDesc.fixed().setTranslation(50, -15);
+    // 1. Endless Flat Floor
+    const floorBodyDesc1 = this.rapier.RigidBodyDesc.fixed().setTranslation(0, -15);
     const floorBody1 = this.world.createRigidBody(floorBodyDesc1);
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(50, 5), floorBody1);
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5), floorBody1);
     
     const f1Vis = new PIXI.Graphics();
-    f1Vis.rect(-50 * 40, -5 * 40, 100 * 40, 10 * 40).fill(0x557755);
-    f1Vis.position.set(50 * 40, 15 * 40);
+    f1Vis.rect(-5000 * 40, -5 * 40, 10000 * 40, 10 * 40).fill(0x557755);
+    f1Vis.position.set(0, 15 * 40);
     this.gameplayLayer.addChild(f1Vis);
 
-    // 2. Factory Floor
-    const factoryMat = 0x444455;
-    const floorBodyDesc2 = this.rapier.RigidBodyDesc.fixed().setTranslation(550, -1510);
-    const floorBody2 = this.world.createRigidBody(floorBodyDesc2);
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(400, 10), floorBody2);
-    
-    const f2Vis = new PIXI.Graphics();
-    f2Vis.rect(-400 * 40, -10 * 40, 800 * 40, 20 * 40).fill(factoryMat);
-    f2Vis.position.set(550 * 40, 1510 * 40);
-    this.gameplayLayer.addChild(f2Vis);
-
-    // Swing Blocks with Static Shadows
-    for (let i = 0; i < 5; i++) {
-      const bx = 10 + i * 20;
-      const by = 4 + (i % 2) * 5;
-      const blockBodyDesc = this.rapier.RigidBodyDesc.fixed().setTranslation(bx, by);
-      const blockBody = this.world.createRigidBody(blockBodyDesc);
-      this.world.createCollider(this.rapier.ColliderDesc.cuboid(2, 2), blockBody);
-      
-      const bVis = new PIXI.Graphics();
-      bVis.rect(-2 * 40, -2 * 40, 4 * 40, 4 * 40).fill(0x665544);
-      bVis.position.set(bx * 40, -by * 40); // Pixi Y is inverted
-      this.gameplayLayer.addChild(bVis);
-    }
-    
     // Boundaries
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-20, -500)));
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(950, -500)));
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(500, 5), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(400, 60)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-200, -500)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(4800, -500)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(0, 60)));
 
     // Parallax Backgrounds
     const farBg = new PIXI.Graphics();
