@@ -84,10 +84,10 @@ class Game {
     // Apply cinematic post-processing to everything
     this.postProcessLayer.filters = [
       new AdvancedBloomFilter({
-        threshold: 0.4,
-        bloomScale: 1.5,
+        threshold: 0.6,
+        bloomScale: 0.6,
         brightness: 1.0,
-        blur: 8,
+        blur: 6,
         quality: 4
       }),
       adjustmentFilter
@@ -218,6 +218,18 @@ class Game {
       trunk.rect(-100, -2000, 200 + Math.random() * 100, 4000).fill(0x2a1b0a);
       trunk.position.set(tx, 0);
       this.bgLayerMid.addChild(trunk);
+    }
+
+    // Tree trunk physics colliders - cast shadows but don't block player movement
+    // CollisionGroups: membership=0x0002, filter=0x0000 → no physical interactions
+    for (let i = 0; i < 15; i++) {
+      const treeX = i * 8 - 10; // Spread across play area
+      const treeY = 10;         // Centered vertically above ground
+      const treeBodyDesc = this.rapier.RigidBodyDesc.fixed().setTranslation(treeX, treeY);
+      const treeBody = this.world.createRigidBody(treeBodyDesc);
+      const treeColDesc = this.rapier.ColliderDesc.cuboid(1.5, 20) // Thin tall trunk
+        .setCollisionGroups(0x00020000); // membership=2, filter=0 → won't collide with anything
+      this.world.createCollider(treeColDesc, treeBody);
     }
   }
 
