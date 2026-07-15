@@ -181,8 +181,8 @@ class Game {
   private animate(deltaMS: number) {
     const deltaTime = Math.min(deltaMS / 1000, 0.1);
 
-    this.world.step();
     this.robotArm.update(this.mousePos, this.isMouseDown);
+    this.world.step();
     
     this.levelManager.update(deltaTime);
     
