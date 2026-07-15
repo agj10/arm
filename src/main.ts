@@ -6,7 +6,7 @@ import { LevelManager } from './LevelManager';
 import { LightingSystem } from './LightingSystem';
 import { Vec2 } from './Vec2';
 import * as RAPIER from '@dimforge/rapier2d';
-import { AdvancedBloomFilter, AdjustmentFilter } from 'pixi-filters';
+import { AdvancedBloomFilter, AdjustmentFilter, GodrayFilter } from 'pixi-filters';
 
 // Fetch and display version
 fetch('/version.json')
@@ -24,6 +24,8 @@ class Game {
   
   private world!: RAPIER.World;
   private rapier!: typeof RAPIER;
+  private godrayFilter!: GodrayFilter;
+  private timeOffset: number = 0;
   private robotArm!: RobotArm;
   private uiManager!: UIManager;
   private levelManager!: LevelManager;
@@ -73,15 +75,25 @@ class Game {
     this.app.stage.scale.set(0.5); // Zoom out 2x to widen FOV
 
     const adjustmentFilter = new AdjustmentFilter({
-      saturation: 1.2,
-      contrast: 1.1,
-      brightness: 1.05
+      gamma: 1.2,
+      saturation: 1.1,
+      contrast: 1.3,
+      brightness: 1.1,
     });
 
+    // Volumetric Light Shafts (God Rays)
+    this.godrayFilter = new GodrayFilter({
+      angle: 30,
+      gain: 0.5,
+      lacunarity: 2.5,
+      time: 0,
+      parallel: true,
+      center: [0, 0] // Will be updated to sun position if not parallel
+    });
+
+    // Apply cinematic post-processing to everything
     this.postProcessLayer = new PIXI.Container();
     this.app.stage.addChild(this.postProcessLayer);
-    
-    // Apply cinematic post-processing to everything
     this.postProcessLayer.filters = [
       new AdvancedBloomFilter({
         threshold: 0.5,
@@ -90,6 +102,7 @@ class Game {
         blur: 4,
         quality: 4
       }),
+      this.godrayFilter,
       adjustmentFilter
     ];
 
@@ -188,6 +201,10 @@ class Game {
 
     this.world.step();
     this.robotArm.update(this.mousePos, this.isMouseDown);
+    
+    // Animate god rays
+    this.timeOffset += deltaTime;
+    this.godrayFilter.time = this.timeOffset;
     this.levelManager.update(deltaTime);
     
     // Position the sun high in the sky (300 pixels above screen center)
