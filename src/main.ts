@@ -6,7 +6,7 @@ import { LevelManager } from './LevelManager';
 import { LightingSystem } from './LightingSystem';
 import { Vec2 } from './Vec2';
 import * as RAPIER from '@dimforge/rapier2d';
-import { AdvancedBloomFilter, AdjustmentFilter } from 'pixi-filters';
+import { AdvancedBloomFilter, AdjustmentFilter, GlowFilter } from 'pixi-filters';
 
 // Fetch and display version
 fetch('/version.json')
@@ -114,7 +114,10 @@ class Game {
     this.silhouetteLayer = new PIXI.Container();
     this.levelMaskContainer = new PIXI.Container();
     this.silhouetteLayer.mask = this.levelMaskContainer;
-    this.silhouetteLayer.filters = [new PIXI.AlphaFilter({ alpha: 0.25 })];
+    this.silhouetteLayer.filters = [
+        new GlowFilter({ distance: 10, outerStrength: 1.5, innerStrength: 0, color: 0x00ffff, quality: 0.2 }),
+        new PIXI.AlphaFilter({ alpha: 0.12 })
+    ];
 
     this.postProcessLayer.addChild(this.skyLayer);
     this.postProcessLayer.addChild(this.bgLayerFar);
