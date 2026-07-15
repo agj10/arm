@@ -85,7 +85,7 @@ class Game {
     this.postProcessLayer.filters = [
       new AdvancedBloomFilter({
         threshold: 0.5,
-        bloomScale: 0.8,
+        bloomScale: 0.4,
         brightness: 1.0,
         blur: 4,
         quality: 4
