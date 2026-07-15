@@ -30,12 +30,12 @@ export class LightingSystem {
     const grd = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
     
     // The light ITSELF creates the beautiful sunset colors over the dark sky.
-    // Alpha is multiplied by 8 layers, so we use very low values to prevent blinding.
-    grd.addColorStop(0, "rgba(255, 255, 200, 0.1)");      // Core: soft warm white (0.8 total)
-    grd.addColorStop(0.05, "rgba(255, 150, 0, 0.04)");    // Inner halo: bright orange (0.32 total)
-    grd.addColorStop(0.2, "rgba(255, 85, 0, 0.02)");      // Mid sky: vibrant target orange (0.16 total)
-    grd.addColorStop(0.5, "rgba(150, 30, 0, 0.01)");      // Outer sky: deep red (0.08 total)
-    grd.addColorStop(1, "rgba(0, 0, 0, 0.0)");            // Fade to nothing
+    // Alpha is multiplied by 8 layers. Spread the colors further out!
+    grd.addColorStop(0, "rgba(255, 255, 220, 0.15)");      // Core: bright white-yellow (Total 1.2)
+    grd.addColorStop(0.05, "rgba(255, 180, 0, 0.08)");     // Inner halo: yellow-orange (Total 0.64)
+    grd.addColorStop(0.25, "rgba(255, 85, 0, 0.05)");      // Mid sky: vibrant target orange (Total 0.40)
+    grd.addColorStop(0.6, "rgba(200, 40, 0, 0.03)");       // Outer sky: deep red-orange (Total 0.24)
+    grd.addColorStop(1, "rgba(50, 10, 0, 0.0)");           // Fade out at the absolute edge
     
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, size, size);
