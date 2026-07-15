@@ -84,10 +84,10 @@ class Game {
     // Apply cinematic post-processing to everything
     this.postProcessLayer.filters = [
       new AdvancedBloomFilter({
-        threshold: 0.4,
-        bloomScale: 1.5,
+        threshold: 0.5,
+        bloomScale: 0.8,
         brightness: 1.0,
-        blur: 8,
+        blur: 4,
         quality: 4
       }),
       adjustmentFilter
