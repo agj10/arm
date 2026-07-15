@@ -91,11 +91,11 @@ export class LightingSystem {
         const angle = (i / this.rayCount) * Math.PI * 2;
         const dir = { x: Math.cos(angle), y: Math.sin(angle) };
         const ray = new this.rapier.Ray({ x: originX, y: originY }, dir);
-        const hit = this.world.castRay(ray, this.maxDistance, false, 0xffffffff, filter);
+        const hit = this.world.castRay(ray, this.maxDistance, false, filter);
 
         let hitDist = this.maxDistance;
-        if (hit && !isNaN((hit as any).toi)) {
-          hitDist = (hit as any).toi;
+        if (hit) {
+          hitDist = hit.timeOfImpact;
         }
         
         const hitX = originX + dir.x * hitDist;
