@@ -39,6 +39,9 @@ class Game {
   private lightLayer!: PIXI.Container;
   private postProcessLayer!: PIXI.Container;
   
+  private targetPpm: number = 40;
+  private currentPpm: number = 40;
+  
   private silhouetteLayer!: PIXI.Container;
   private levelMaskContainer!: PIXI.Container;
 
@@ -155,12 +158,21 @@ class Game {
       const cx = window.innerWidth / 2;
       const cy = window.innerHeight / 2;
       const stageScale = 0.5;
-      const ppm = 40;
+      const ppm = this.currentPpm;
       const worldX = (e.clientX - cx) / (ppm * stageScale) + this.cameraPos.x;
       const worldY = -(e.clientY - cy) / (ppm * stageScale) + this.cameraPos.y; 
       
       this.mousePos.x = worldX;
       this.mousePos.y = worldY;
+    });
+    window.addEventListener('wheel', (e) => {
+        const zoomSpeed = 2.0;
+        if (e.deltaY < 0) {
+            this.targetPpm += zoomSpeed;
+        } else {
+            this.targetPpm -= zoomSpeed;
+        }
+        this.targetPpm = Math.max(30, Math.min(55, this.targetPpm));
     });
     window.addEventListener('mousedown', () => this.isMouseDown = true);
     window.addEventListener('mouseup', () => this.isMouseDown = false);
@@ -223,7 +235,8 @@ class Game {
     this.cameraPos.x += (targetCamX - this.cameraPos.x) * 5 * deltaTime;
     this.cameraPos.y += (targetCamY - this.cameraPos.y) * 5 * deltaTime;
     
-    const ppm = 40;
+    this.currentPpm += (this.targetPpm - this.currentPpm) * 0.1;
+    const ppm = this.currentPpm;
     const stageScale = 0.5;
     const cx = (window.innerWidth / 2) / stageScale;
     const cy = (window.innerHeight / 2) / stageScale;
