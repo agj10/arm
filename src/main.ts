@@ -49,7 +49,7 @@ class Game {
   private isMouseDown = false;
   private mousePos = new Vec2();
   private cameraPos = new Vec2(0, 0);
-  private sunVisual!: PIXI.Graphics;
+  private sunVisual!: PIXI.Container;
 
   constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
