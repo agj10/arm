@@ -40,7 +40,7 @@ export class RobotArm {
     const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -1);
     this.rigidBody = world.createRigidBody(rigidBodyDesc);
     const colliderDesc = rapierModule.ColliderDesc.ball(0.8)
-      .setMass(2.0).setCollisionGroups(0x00040000); // 0x00040000 = no collision with level geometry
+      .setMass(2.0).setCollisionGroups(0x00040008); // Casts shadow, no level collision
     world.createCollider(colliderDesc, this.rigidBody);
 
     this.bodyMesh = new PIXI.Graphics();
@@ -80,7 +80,7 @@ export class RobotArm {
 
       const armBodyDesc = rapierModule.RigidBodyDesc.kinematicPositionBased();
       const armBody = world.createRigidBody(armBodyDesc);
-      const armColDesc = rapierModule.ColliderDesc.cuboid(0.25, 1.25).setCollisionGroups(0x00040000);
+      const armColDesc = rapierModule.ColliderDesc.cuboid(0.25, 1.25).setCollisionGroups(0x00040008);
       world.createCollider(armColDesc, armBody);
       this.armBodies.push(armBody);
     }
@@ -99,7 +99,7 @@ export class RobotArm {
 
       const jointBodyDesc = rapierModule.RigidBodyDesc.kinematicPositionBased();
       const jointBody = world.createRigidBody(jointBodyDesc);
-      const jointColDesc = rapierModule.ColliderDesc.ball(0.4).setCollisionGroups(0x00040000);
+      const jointColDesc = rapierModule.ColliderDesc.ball(0.4).setCollisionGroups(0x00040008);
       world.createCollider(jointColDesc, jointBody);
       this.jointBodies.push(jointBody);
     }

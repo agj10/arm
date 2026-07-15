@@ -75,7 +75,7 @@ export class LightingSystem {
     const maxPixelDist = this.maxDistance * 40;
     
     // Only exclude sensors (arm segment colliders) - let player body/claw cast shadows
-    const filter = this.rapier.QueryFilterFlags.EXCLUDE_SENSORS;
+    const filterFlags = this.rapier.QueryFilterFlags.EXCLUDE_SENSORS;
 
     for (let s = 0; s < samples; s++) {
       const sampleAngle = (s / samples) * Math.PI * 2;
@@ -99,7 +99,7 @@ export class LightingSystem {
         const angle = (i / this.rayCount) * Math.PI * 2;
         const dir = { x: Math.cos(angle), y: Math.sin(angle) };
         const ray = new this.rapier.Ray({ x: originX, y: originY }, dir);
-        const hit = this.world.castRay(ray, this.maxDistance, false, filter);
+        const hit = this.world.castRay(ray, this.maxDistance, false, 0x00080005, filterFlags);
 
         let hitDist = this.maxDistance;
         if (hit) {

@@ -100,12 +100,8 @@ class Game {
 
     this.skyLayer = new PIXI.Container();
     
-    const sun = new PIXI.Graphics();
-    sun.circle(0, 0, 60).fill({ color: 0xffffee });
-    sun.position.set(window.innerWidth * 0.7, window.innerHeight * 0.7);
-    
-    this.skyLayer.addChild(sun);
-    this.sunVisual = sun;
+    this.sunVisual = new PIXI.Container();
+    this.skyLayer.addChild(this.sunVisual);
     
     this.bgLayerFar = new PIXI.Container();
     this.bgLayerMid = new PIXI.Container();
