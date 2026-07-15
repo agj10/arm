@@ -37,6 +37,9 @@ class Game {
   private shadowLayer!: PIXI.Container;
   private lightLayer!: PIXI.Container;
   private postProcessLayer!: PIXI.Container;
+  
+  private silhouetteLayer!: PIXI.Container;
+  private levelMaskContainer!: PIXI.Container;
 
   // Input & State
   private isMouseDown = false;
@@ -54,14 +57,13 @@ class Game {
     
     this.app = new PIXI.Application();
     
-    // Pixel Art settings
     PIXI.AbstractRenderer.defaultOptions.roundPixels = true;
     PIXI.TextureStyle.defaultOptions.scaleMode = 'nearest';
 
     await this.app.init({ 
       width: window.innerWidth, 
       height: window.innerHeight, 
-      backgroundColor: 0xaa5533, // Darker, moody sunset orange sky
+      backgroundColor: 0xaa5533,
       resizeTo: window,
       antialias: false
     });
@@ -70,7 +72,7 @@ class Game {
     container.innerHTML = ''; 
     container.appendChild(this.app.canvas);
 
-    this.app.stage.scale.set(0.5); // Zoom out 2x to widen FOV
+    this.app.stage.scale.set(0.5);
 
     const adjustmentFilter = new AdjustmentFilter({
       gamma: 1.2,
@@ -79,7 +81,6 @@ class Game {
       brightness: 1.1,
     });
 
-    // Apply cinematic post-processing to everything
     this.postProcessLayer = new PIXI.Container();
     this.app.stage.addChild(this.postProcessLayer);
     this.postProcessLayer.filters = [
@@ -95,11 +96,9 @@ class Game {
 
     this.skyLayer = new PIXI.Container();
     
-    // Draw a sunset Sun in the sky
     const sun = new PIXI.Graphics();
-    sun.circle(0, 0, 60).fill({ color: 0xffffee }); // Smaller, brighter core
+    sun.circle(0, 0, 60).fill({ color: 0xffffee });
     sun.position.set(window.innerWidth * 0.7, window.innerHeight * 0.7);
-    // Glow is handled by LightingSystem
     
     this.skyLayer.addChild(sun);
     this.sunVisual = sun;
@@ -109,44 +108,41 @@ class Game {
     this.gameplayLayer = new PIXI.Container();
     this.shadowLayer = new PIXI.Container();
     this.lightLayer = new PIXI.Container();
+    
+    this.silhouetteLayer = new PIXI.Container();
+    this.levelMaskContainer = new PIXI.Container();
+    this.silhouetteLayer.mask = this.levelMaskContainer;
 
     this.postProcessLayer.addChild(this.skyLayer);
     this.postProcessLayer.addChild(this.bgLayerFar);
     this.postProcessLayer.addChild(this.bgLayerMid);
     this.postProcessLayer.addChild(this.gameplayLayer);
+    this.postProcessLayer.addChild(this.silhouetteLayer);
     
-    // Dark Ambient Shadow (Sunset Twilight)
     const shadowOverlay = new PIXI.Graphics();
-    shadowOverlay.rect(-50000, -50000, 100000, 100000).fill({ color: 0x221133, alpha: 0.45 }); // Lighter shadow
+    shadowOverlay.rect(-50000, -50000, 100000, 100000).fill({ color: 0x221133, alpha: 0.45 });
     this.shadowLayer.addChild(shadowOverlay);
-    
     this.shadowLayer.blendMode = 'multiply';
     this.postProcessLayer.addChild(this.shadowLayer);
 
-    // Physics World
     const gravity = { x: 0.0, y: -30.0 };
     this.world = new this.rapier.World(gravity);
 
-    // Dynamic Lighting System
     this.lightingSystem = new LightingSystem(this.world, this.rapier);
     this.lightLayer = this.lightingSystem.lightContainer;
     this.postProcessLayer.addChild(this.lightLayer);
 
     // Create Robot Arm
-    this.robotArm = new RobotArm(this.gameplayLayer, this.world, this.rapier);
+    this.robotArm = new RobotArm(this.gameplayLayer, this.silhouetteLayer, this.world, this.rapier);
     
-    // Level Manager
     this.levelManager = new LevelManager(this.uiManager, this.robotArm);
-
     this.createTestScene();
 
-    // Input events
     window.addEventListener('mousemove', (e) => {
       const cx = window.innerWidth / 2;
       const cy = window.innerHeight / 2;
       const stageScale = 0.5;
       const ppm = 40;
-      // Convert screen pixels to world units, accounting for stage scale
       const worldX = (e.clientX - cx) / (ppm * stageScale) + this.cameraPos.x;
       const worldY = -(e.clientY - cy) / (ppm * stageScale) + this.cameraPos.y; 
       
@@ -162,7 +158,7 @@ class Game {
   }
 
   private createTestScene() {
-    // 1. Endless Flat Floor
+    // Floor
     const floorBodyDesc1 = this.rapier.RigidBodyDesc.fixed().setTranslation(0, -15);
     const floorBody1 = this.world.createRigidBody(floorBodyDesc1);
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5), floorBody1);
@@ -171,11 +167,31 @@ class Game {
     f1Vis.rect(-5000 * 40, -5 * 40, 10000 * 40, 10 * 40).fill(0x557755);
     f1Vis.position.set(0, 15 * 40);
     this.gameplayLayer.addChild(f1Vis);
+    
+    const f1Mask = new PIXI.Graphics();
+    f1Mask.rect(-5000 * 40, -5 * 40, 10000 * 40, 10 * 40).fill(0xffffff);
+    f1Mask.position.set(0, 15 * 40);
+    this.levelMaskContainer.addChild(f1Mask);
 
-    // Boundaries
+    // Walls
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-200, -500)));
+    const w1Mask = new PIXI.Graphics();
+    w1Mask.rect(-5 * 40, -1000 * 40, 10 * 40, 2000 * 40).fill(0xffffff);
+    w1Mask.position.set(-200 * 40, 500 * 40); // Y is flipped visually
+    this.levelMaskContainer.addChild(w1Mask);
+
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(4800, -500)));
+    const w2Mask = new PIXI.Graphics();
+    w2Mask.rect(-5 * 40, -1000 * 40, 10 * 40, 2000 * 40).fill(0xffffff);
+    w2Mask.position.set(4800 * 40, 500 * 40);
+    this.levelMaskContainer.addChild(w2Mask);
+
+    // Ceiling
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(0, 60)));
+    const cMask = new PIXI.Graphics();
+    cMask.rect(-5000 * 40, -5 * 40, 10000 * 40, 10 * 40).fill(0xffffff);
+    cMask.position.set(0, -60 * 40);
+    this.levelMaskContainer.addChild(cMask);
   }
 
   private animate(deltaMS: number) {
@@ -186,11 +202,9 @@ class Game {
     
     this.levelManager.update(deltaTime);
     
-    // Position the sun high in the sky (300 pixels above screen center)
     const sunWorldPos = new Vec2(this.cameraPos.x, this.cameraPos.y + 7.5);
     this.lightingSystem.update(sunWorldPos);
 
-    // Parallax Camera System
     const targetCamX = this.robotArm.clawPos.x;
     const targetCamY = this.robotArm.clawPos.y; 
     this.cameraPos.x += (targetCamX - this.cameraPos.x) * 5 * deltaTime;
@@ -201,23 +215,24 @@ class Game {
     const cx = (window.innerWidth / 2) / stageScale;
     const cy = (window.innerHeight / 2) / stageScale;
 
-    // Fix Sun high in the sky (center X, top Y)
     this.sunVisual.position.set(cx, cy - 300);
 
     this.gameplayLayer.x = cx - this.cameraPos.x * ppm;
     this.gameplayLayer.y = cy - (-this.cameraPos.y * ppm);
 
-    // Sync Lighting & Shadows to Camera
     this.shadowLayer.x = this.gameplayLayer.x;
     this.shadowLayer.y = this.gameplayLayer.y;
     this.lightLayer.x = this.gameplayLayer.x;
     this.lightLayer.y = this.gameplayLayer.y;
+    
+    this.silhouetteLayer.x = this.gameplayLayer.x;
+    this.silhouetteLayer.y = this.gameplayLayer.y;
+    this.levelMaskContainer.x = this.gameplayLayer.x;
+    this.levelMaskContainer.y = this.gameplayLayer.y;
 
-    // Parallax - Midground (Trees)
     this.bgLayerMid.x = cx - this.cameraPos.x * ppm * 0.5;
     this.bgLayerMid.y = cy - (-this.cameraPos.y * ppm * 0.5) - 300;
 
-    // Parallax - Far Background
     this.bgLayerFar.x = cx - this.cameraPos.x * ppm * 0.1 - 2500;
     this.bgLayerFar.y = cy - (-this.cameraPos.y * ppm * 0.1) - 1000;
   }

@@ -5,9 +5,13 @@ import { Vec2 } from './Vec2';
 export class RobotArm {
   public bodyMesh: PIXI.Graphics;
   public clawMesh: PIXI.Graphics;
-  
   private armMeshes: PIXI.Graphics[] = [];
   private jointMeshes: PIXI.Graphics[] = [];
+
+  public silBodyMesh: PIXI.Graphics;
+  public silClawMesh: PIXI.Graphics;
+  private silArmMeshes: PIXI.Graphics[] = [];
+  private silJointMeshes: PIXI.Graphics[] = [];
   
   private joints: Vec2[] = [];
   private armLengths: number[] = [2.5, 2.5, 2.5];
@@ -18,8 +22,9 @@ export class RobotArm {
   // @ts-ignore
   private ropeJoint: RAPIER.ImpulseJoint;
 
-  private isAttached: boolean = true;
+  private isAttached: boolean = false;
   private prevIsMouseDown: boolean = false;
+  private detachCooldown: number = 0;
 
   private armBodies: RAPIER.RigidBody[] = [];
   private jointBodies: RAPIER.RigidBody[] = [];
@@ -27,7 +32,7 @@ export class RobotArm {
   private rapier: typeof RAPIER;
   private world: RAPIER.World;
   
-  constructor(container: PIXI.Container, world: RAPIER.World, rapierModule: typeof RAPIER) {
+  constructor(container: PIXI.Container, silhouetteContainer: PIXI.Container, world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
     this.world = world;
     this.clawPos = new Vec2(0, -5);
@@ -36,12 +41,16 @@ export class RobotArm {
     const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -1);
     this.rigidBody = world.createRigidBody(rigidBodyDesc);
     const colliderDesc = rapierModule.ColliderDesc.ball(0.8)
-      .setMass(2.0); // NOT a sensor! It will collide with the ground!
+      .setMass(2.0).setCollisionGroups(0x00040000); // 0x00040000 = no collision with level geometry
     world.createCollider(colliderDesc, this.rigidBody);
 
     this.bodyMesh = new PIXI.Graphics();
     this.bodyMesh.circle(0, 0, 0.8 * 40).fill(0x4a4a4a);
     container.addChild(this.bodyMesh);
+    
+    this.silBodyMesh = new PIXI.Graphics();
+    this.silBodyMesh.circle(0, 0, 0.8 * 40).fill({color: 0x00ffff, alpha: 0.5});
+    silhouetteContainer.addChild(this.silBodyMesh);
 
     // Claw
     const clawBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -5).setLinearDamping(0.5);
@@ -51,14 +60,29 @@ export class RobotArm {
     world.createCollider(clawColDesc, this.clawBody);
 
     this.clawMesh = new PIXI.Graphics();
-    this.clawMesh.rect(-0.6 * 40, -0.6 * 40, 1.2 * 40, 1.2 * 40).fill(0x8b5a2b);
+    this.clawMesh.roundRect(-15, -15, 30, 15, 4).fill(0x3a3a3a);
+    this.clawMesh.poly([-15, 0, -20, 25, -10, 25, -5, 0]).fill(0x5a5a5a);
+    this.clawMesh.poly([15, 0, 20, 25, 10, 25, 5, 0]).fill(0x5a5a5a);
+    this.clawMesh.circle(0, -5, 6).fill(0xee8822);
     container.addChild(this.clawMesh);
+
+    this.silClawMesh = new PIXI.Graphics();
+    this.silClawMesh.roundRect(-15, -15, 30, 15, 4).fill({color: 0x00ffff, alpha: 0.5});
+    this.silClawMesh.poly([-15, 0, -20, 25, -10, 25, -5, 0]).fill({color: 0x00ffff, alpha: 0.5});
+    this.silClawMesh.poly([15, 0, 20, 25, 10, 25, 5, 0]).fill({color: 0x00ffff, alpha: 0.5});
+    silhouetteContainer.addChild(this.silClawMesh);
 
     for (let i = 0; i < 3; i++) {
       const arm = new PIXI.Graphics();
       arm.rect(-0.25 * 40, 0, 0.5 * 40, 1 * 40).fill(0x5a5a5a);
       container.addChild(arm);
       this.armMeshes.push(arm);
+      
+      const silArm = new PIXI.Graphics();
+      silArm.rect(-0.25 * 40, 0, 0.5 * 40, 1 * 40).fill({color: 0x00ffff, alpha: 0.5});
+      silhouetteContainer.addChild(silArm);
+      this.silArmMeshes.push(silArm);
+      
       this.joints.push(new Vec2());
 
       const armBodyDesc = rapierModule.RigidBodyDesc.kinematicPositionBased();
@@ -74,6 +98,11 @@ export class RobotArm {
       jMesh.circle(0, 0, 0.4 * 40).fill(0x8b5a2b);
       container.addChild(jMesh);
       this.jointMeshes.push(jMesh);
+      
+      const silJMesh = new PIXI.Graphics();
+      silJMesh.circle(0, 0, 0.4 * 40).fill({color: 0x00ffff, alpha: 0.5});
+      silhouetteContainer.addChild(silJMesh);
+      this.silJointMeshes.push(silJMesh);
 
       const jointBodyDesc = rapierModule.RigidBodyDesc.kinematicPositionBased();
       const jointBody = world.createRigidBody(jointBodyDesc);
@@ -92,65 +121,78 @@ export class RobotArm {
     const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
     const basePos = this.rigidBody.translation();
 
-    if (!isMouseDown) {
-      // Released - detach and follow mouse
-      this.isAttached = false;
+    if (this.detachCooldown > 0) {
+        this.detachCooldown--;
+    }
+
+    if (!this.isAttached) {
+      // Flying state
       this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
 
-      // Claw flies towards mouse cursor
-      const cPos = this.clawBody.translation();
-      const targetPos = mousePos.clone();
-      const dir = targetPos.sub(new Vec2(cPos.x, cPos.y));
-      
-      // Proportional velocity to track mouse, gravity is handled naturally by physics
-      this.clawBody.setLinvel({ x: dir.x * 12, y: dir.y * 12 }, true);
-      
-      this.clawPos.set(cPos.x, cPos.y);
-    } else {
-      // Pressed - try to grapple!
-      if (!this.isAttached) {
-         // Aim towards mouse from base
-         const dir = mousePos.clone().sub(new Vec2(basePos.x, basePos.y));
-         const distToMouse = dir.length();
-         
-         if (distToMouse > 0.1) {
-            dir.normalize();
-            // Raycast to find the nearest solid surface in that direction
-            const ray = new this.rapier.Ray({ x: basePos.x, y: basePos.y }, { x: dir.x, y: dir.y });
+      // Auto-attach on collision with any fixed geometry
+      if (this.detachCooldown <= 0) {
+          const cPos = this.clawBody.translation();
+          const dirs = [{x:0,y:-0.7}, {x:0,y:0.7}, {x:-0.7,y:0}, {x:0.7,y:0}];
+          let attachedPoint = null;
+          for (const d of dirs) {
+            const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, d);
             const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
-            const hit = this.world.castRay(ray, maxDist, true, filter);
-            
+            const hit = this.world.castRay(ray, 0.7, true, filter);
             if (hit) {
-                // Hit a surface! Attach the claw instantly.
-                this.isAttached = true;
-                const hitPoint = new Vec2(
-                    ray.origin.x + ray.dir.x * hit.timeOfImpact,
-                    ray.origin.y + ray.dir.y * hit.timeOfImpact
-                );
-                this.clawPos.copy(hitPoint);
-                this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
-                this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
-                this.clawBody.setLinvel({ x: 0, y: 0 }, true);
+              attachedPoint = new Vec2(
+                ray.origin.x + ray.dir.x * hit.timeOfImpact,
+                ray.origin.y + ray.dir.y * hit.timeOfImpact
+              );
+              break;
             }
+          }
+
+          if (attachedPoint) { 
+            this.isAttached = true;
+            this.clawPos.set(attachedPoint.x, attachedPoint.y); 
+            this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
+            this.clawBody.setTranslation({ x: attachedPoint.x, y: attachedPoint.y }, true);
+            this.clawBody.setLinvel({ x: 0, y: 0 }, true);
+          }
+      }
+      
+      if (!this.isAttached) {
+          const cPos = this.clawBody.translation();
+          this.clawPos.set(cPos.x, cPos.y);
+      }
+    } else {
+      // Attached state
+      this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
+      this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
+      this.clawBody.setTranslation({ x: this.clawPos.x, y: this.clawPos.y }, true);
+
+      if (this.prevIsMouseDown && !isMouseDown) {
+         // Released! Detach and swing out!
+         this.isAttached = false;
+         this.detachCooldown = 15; 
+         this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
+      } else {
+         // Follow point-symmetric target smoothly
+         let targetPos = new Vec2(
+             this.clawPos.x - (mousePos.x - this.clawPos.x),
+             this.clawPos.y - (mousePos.y - this.clawPos.y)
+         );
+         
+         if (targetPos.distanceTo(this.clawPos) > maxDist) {
+             const dir = targetPos.clone().sub(this.clawPos).normalize();
+             targetPos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
          }
          
-         // If still not attached (aimed at empty air), just act like released
-         if (!this.isAttached) {
-            this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
-            const cPos = this.clawBody.translation();
-            const targetPos = mousePos.clone();
-            const dir2 = targetPos.sub(new Vec2(cPos.x, cPos.y));
-            this.clawBody.setLinvel({ x: dir2.x * 12, y: dir2.y * 12 }, true);
-            this.clawPos.set(cPos.x, cPos.y);
-         }
-      }
-
-      if (this.isAttached) {
-         // Swinging! The claw stays locked, the base swings freely.
-         this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
-         this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
-         this.clawBody.setTranslation({ x: this.clawPos.x, y: this.clawPos.y }, true);
+         const baseVel = this.rigidBody.linvel();
+         const targetVx = (targetPos.x - basePos.x) * 12;
+         const targetVy = (targetPos.y - basePos.y) * 12;
+         
+         const lerpFactor = 0.2; 
+         this.rigidBody.setLinvel({
+             x: baseVel.x + (targetVx - baseVel.x) * lerpFactor,
+             y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
+         }, true);
       }
     }
 
@@ -168,9 +210,13 @@ export class RobotArm {
     const pos = this.rigidBody.translation();
     this.bodyMesh.position.set(pos.x * 40, -pos.y * 40); 
     this.bodyMesh.rotation = -this.rigidBody.rotation();
+    this.silBodyMesh.position.copyFrom(this.bodyMesh.position);
+    this.silBodyMesh.rotation = this.bodyMesh.rotation;
 
     this.clawMesh.position.set(this.clawPos.x * 40, -this.clawPos.y * 40);
     this.clawMesh.rotation = -this.clawBody.rotation();
+    this.silClawMesh.position.copyFrom(this.clawMesh.position);
+    this.silClawMesh.rotation = this.clawMesh.rotation;
 
     this.updateIK();
   }
@@ -203,18 +249,34 @@ export class RobotArm {
       this.joints[1].lerpVectors(base, target, 1/3);
       this.joints[2].lerpVectors(base, target, 2/3);
     } else {
-      const n = new Vec2(-dir.y, dir.x); 
+      const n1 = new Vec2(-dir.y, dir.x); 
+      const n2 = new Vec2(dir.y, -dir.x); 
       const cosTheta = Math.max(-1, Math.min(1, (dist - L) / (2 * L)));
       const theta = Math.acos(cosTheta);
       
-      this.joints[1].set(
-        base.x + L * (dir.x * Math.cos(theta) + n.x * Math.sin(theta)),
-        base.y + L * (dir.y * Math.cos(theta) + n.y * Math.sin(theta))
+      const elbow1 = new Vec2(
+        base.x + L * (dir.x * Math.cos(theta) + n1.x * Math.sin(theta)),
+        base.y + L * (dir.y * Math.cos(theta) + n1.y * Math.sin(theta))
       );
-      this.joints[2].set(
-        target.x - L * dir.x * Math.cos(theta) + L * n.x * Math.sin(theta),
-        target.y - L * dir.y * Math.cos(theta) + L * n.y * Math.sin(theta)
+      const elbow2 = new Vec2(
+        base.x + L * (dir.x * Math.cos(theta) + n2.x * Math.sin(theta)),
+        base.y + L * (dir.y * Math.cos(theta) + n2.y * Math.sin(theta))
       );
+
+      const prevElbow = this.joints[1].clone();
+      if (elbow1.distanceTo(prevElbow) <= elbow2.distanceTo(prevElbow)) {
+          this.joints[1].copy(elbow1);
+          this.joints[2].set(
+            target.x - L * dir.x * Math.cos(theta) + L * n1.x * Math.sin(theta),
+            target.y - L * dir.y * Math.cos(theta) + L * n1.y * Math.sin(theta)
+          );
+      } else {
+          this.joints[1].copy(elbow2);
+          this.joints[2].set(
+            target.x - L * dir.x * Math.cos(theta) + L * n2.x * Math.sin(theta),
+            target.y - L * dir.y * Math.cos(theta) + L * n2.y * Math.sin(theta)
+          );
+      }
     }
 
     for (let i = 0; i < 3; i++) {
@@ -231,13 +293,17 @@ export class RobotArm {
       const visualAngle = Math.atan2(-end.y - (-start.y), end.x - start.x);
       
       this.armMeshes[i].rotation = visualAngle - Math.PI / 2;
+      this.silArmMeshes[i].position.copyFrom(this.armMeshes[i].position);
+      this.silArmMeshes[i].rotation = this.armMeshes[i].rotation;
       
       this.armBodies[i].setTranslation({ x: cx, y: cy }, true);
       this.armBodies[i].setRotation(physicalAngle - Math.PI / 2, true);
 
       if (i < 2) {
         this.jointMeshes[i].position.set(end.x * 40, -end.y * 40);
-        this.jointMeshes[i].rotation = visualAngle - Math.PI / 2; // Approximate rotation for joints if textured
+        this.jointMeshes[i].rotation = visualAngle - Math.PI / 2;
+        this.silJointMeshes[i].position.copyFrom(this.jointMeshes[i].position);
+        this.silJointMeshes[i].rotation = this.jointMeshes[i].rotation;
         this.jointBodies[i].setTranslation({ x: end.x, y: end.y }, true);
       }
     }
