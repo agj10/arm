@@ -67,12 +67,12 @@ export class RobotArm {
 
     for (let i = 0; i < 3; i++) {
       const arm = new PIXI.Graphics();
-      arm.rect(-0.25 * 40, -1.25 * 40, 0.5 * 40, 2.5 * 40).fill(0x5a5a5a);
+      arm.rect(-0.25 * 40, 0, 0.5 * 40, 1 * 40).fill(0x5a5a5a);
       container.addChild(arm);
       this.armMeshes.push(arm);
       
       const silArm = new PIXI.Graphics();
-      silArm.rect(-0.25 * 40, -1.25 * 40, 0.5 * 40, 2.5 * 40).fill(0x00ffff);
+      silArm.rect(-0.25 * 40, 0, 0.5 * 40, 1 * 40).fill(0x00ffff);
       silhouetteContainer.addChild(silArm);
       this.silArmMeshes.push(silArm);
       
@@ -282,13 +282,15 @@ export class RobotArm {
       const cy = (start.y + end.y) / 2;
       
       this.armMeshes[i].position.set(start.x * 40, -start.y * 40);
-      this.armMeshes[i].scale.set(1, L);
+      const actualDist = start.distanceTo(end);
+      this.armMeshes[i].scale.set(1, actualDist);
       
       const physicalAngle = Math.atan2(end.y - start.y, end.x - start.x);
       const visualAngle = Math.atan2(-end.y - (-start.y), end.x - start.x);
       
       this.armMeshes[i].rotation = visualAngle - Math.PI / 2;
       this.silArmMeshes[i].position.copyFrom(this.armMeshes[i].position);
+      this.silArmMeshes[i].scale.copyFrom(this.armMeshes[i].scale);
       this.silArmMeshes[i].rotation = this.armMeshes[i].rotation;
       
       this.armBodies[i].setTranslation({ x: cx, y: cy }, true);
