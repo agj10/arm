@@ -39,8 +39,8 @@ class Game {
   private lightLayer!: PIXI.Container;
   private postProcessLayer!: PIXI.Container;
   
-  private targetPpm: number = 40;
-  private currentPpm: number = 40;
+  private targetZoom: number = 1.0;
+  private currentZoom: number = 1.0;
   
   private silhouetteLayer!: PIXI.Container;
   private levelMaskContainer!: PIXI.Container;
@@ -158,21 +158,23 @@ class Game {
       const cx = window.innerWidth / 2;
       const cy = window.innerHeight / 2;
       const stageScale = 0.5;
-      const ppm = this.currentPpm;
-      const worldX = (e.clientX - cx) / (ppm * stageScale) + this.cameraPos.x;
-      const worldY = -(e.clientY - cy) / (ppm * stageScale) + this.cameraPos.y; 
+      const ppm = 40;
+      const zoom = this.currentZoom;
+      const worldX = (e.clientX - cx) / (ppm * zoom * stageScale) + this.cameraPos.x;
+      const worldY = -(e.clientY - cy) / (ppm * zoom * stageScale) + this.cameraPos.y; 
       
       this.mousePos.x = worldX;
       this.mousePos.y = worldY;
     });
+
     window.addEventListener('wheel', (e) => {
-        const zoomSpeed = 2.0;
+        const zoomSpeed = 0.05;
         if (e.deltaY < 0) {
-            this.targetPpm += zoomSpeed;
+            this.targetZoom += zoomSpeed;
         } else {
-            this.targetPpm -= zoomSpeed;
+            this.targetZoom -= zoomSpeed;
         }
-        this.targetPpm = Math.max(30, Math.min(55, this.targetPpm));
+        this.targetZoom = Math.max(0.6, Math.min(1.5, this.targetZoom));
     });
     window.addEventListener('mousedown', () => this.isMouseDown = true);
     window.addEventListener('mouseup', () => this.isMouseDown = false);
@@ -235,34 +237,33 @@ class Game {
     this.cameraPos.x += (targetCamX - this.cameraPos.x) * 5 * deltaTime;
     this.cameraPos.y += (targetCamY - this.cameraPos.y) * 5 * deltaTime;
     
-    this.currentPpm += (this.targetPpm - this.currentPpm) * 0.1;
-    const ppm = this.currentPpm;
+    this.currentZoom += (this.targetZoom - this.currentZoom) * 0.1;
+    const zoom = this.currentZoom;
+    const ppm = 40;
     const stageScale = 0.5;
     const cx = (window.innerWidth / 2) / stageScale;
     const cy = (window.innerHeight / 2) / stageScale;
 
     this.sunVisual.position.set(cx, cy - 300);
 
-    this.gameplayLayer.x = cx - this.cameraPos.x * ppm;
-    this.gameplayLayer.y = cy - (-this.cameraPos.y * ppm);
-    this.clawLayer.x = this.gameplayLayer.x;
-    this.clawLayer.y = this.gameplayLayer.y;
+    const layers = [
+      this.gameplayLayer, this.clawLayer, this.shadowLayer, 
+      this.lightLayer, this.silhouetteLayer, this.levelMaskContainer
+    ];
 
-    this.shadowLayer.x = this.gameplayLayer.x;
-    this.shadowLayer.y = this.gameplayLayer.y;
-    this.lightLayer.x = this.gameplayLayer.x;
-    this.lightLayer.y = this.gameplayLayer.y;
-    
-    this.silhouetteLayer.x = this.gameplayLayer.x;
-    this.silhouetteLayer.y = this.gameplayLayer.y;
-    this.levelMaskContainer.x = this.gameplayLayer.x;
-    this.levelMaskContainer.y = this.gameplayLayer.y;
+    layers.forEach(layer => {
+      layer.scale.set(zoom);
+      layer.x = cx - this.cameraPos.x * ppm * zoom;
+      layer.y = cy - (-this.cameraPos.y * ppm) * zoom;
+    });
 
-    this.bgLayerMid.x = cx - this.cameraPos.x * ppm * 0.5;
-    this.bgLayerMid.y = cy - (-this.cameraPos.y * ppm * 0.5) - 300;
+    this.bgLayerMid.scale.set(zoom);
+    this.bgLayerMid.x = cx - this.cameraPos.x * ppm * zoom * 0.5;
+    this.bgLayerMid.y = cy - (-this.cameraPos.y * ppm * zoom * 0.5) - 300 * zoom;
 
-    this.bgLayerFar.x = cx - this.cameraPos.x * ppm * 0.1 - 2500;
-    this.bgLayerFar.y = cy - (-this.cameraPos.y * ppm * 0.1) - 1000;
+    this.bgLayerFar.scale.set(zoom);
+    this.bgLayerFar.x = cx - this.cameraPos.x * ppm * zoom * 0.1 - 2500 * zoom;
+    this.bgLayerFar.y = cy - (-this.cameraPos.y * ppm * zoom * 0.1) - 1000 * zoom;
   }
 }
 
