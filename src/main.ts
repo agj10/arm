@@ -95,9 +95,9 @@ class Game {
 
     this.skyLayer = new PIXI.Container();
     
-    // Draw a sunset Sun in the sky
+    // Draw a massive sunset Sun in the sky
     const sun = new PIXI.Graphics();
-    sun.circle(0, 0, 90).fill({ color: 0xffffee }); // Larger sun
+    sun.circle(0, 0, 200).fill({ color: 0xffffee }); // 2x+ larger sun
     sun.position.set(window.innerWidth * 0.7, window.innerHeight * 0.7);
     // Glow is handled by LightingSystem
     
@@ -186,8 +186,8 @@ class Game {
     
     this.levelManager.update(deltaTime);
     
-    // Position the sun on the horizon (world Y = -8, top of floor is -10)
-    const sunWorldPos = new Vec2(this.cameraPos.x, -8);
+    // Position the sun exactly half-submerged on the horizon (world Y = -10)
+    const sunWorldPos = new Vec2(this.cameraPos.x, -10);
     this.lightingSystem.update(sunWorldPos);
 
     // Parallax Camera System
@@ -201,8 +201,8 @@ class Game {
     const cx = (window.innerWidth / 2) / stageScale;
     const cy = (window.innerHeight / 2) / stageScale;
 
-    // Fix Sun to rest on the horizon (gameplay Y = 320)
-    this.sunVisual.position.set(cx, this.gameplayLayer.y + 320);
+    // Fix Sun to be exactly half-submerged on the horizon (gameplay Y = 400)
+    this.sunVisual.position.set(cx, this.gameplayLayer.y + 400);
 
     this.gameplayLayer.x = cx - this.cameraPos.x * ppm;
     this.gameplayLayer.y = cy - (-this.cameraPos.y * ppm);
