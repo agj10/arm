@@ -164,6 +164,7 @@ export class RobotArm {
             const R = Math.atan2(-vel.y, vel.x) - Math.PI / 2;
             this.clawBody.setRotation(-R, true);
         }
+      }
     } else {
       this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
