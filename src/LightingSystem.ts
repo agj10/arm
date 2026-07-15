@@ -12,7 +12,7 @@ export class LightingSystem {
   private lightTexture: PIXI.Texture;
 
   private rayCount: number = 360; // 360 is plenty for smooth shadows
-  private maxDistance: number = 40; // 40m = 1600px, enough for screen
+  private maxDistance: number = 80; // 80m = 3200px, enough to cover entire screen even when zoomed out
 
   constructor(world: RAPIER.World, rapierModule: typeof RAPIER) {
     this.world = world;
@@ -21,18 +21,22 @@ export class LightingSystem {
     this.lightContainer = new PIXI.Container();
     this.lightContainer.blendMode = 'add';
     
-    // Create a smooth radial gradient texture
+    // Create a massive smooth radial gradient texture for the sunset
     const canvas = document.createElement('canvas');
-    const size = 2048;
+    const size = 4096;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d')!;
     const grd = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-    // Sharp bright core with a subtle atmospheric outer glow
-    // Alpha is multiplied by 8 layers, so 0.125 = 1.0 total alpha
-    grd.addColorStop(0, "rgba(255, 255, 230, 0.4)");    // Core (very bright white-yellow)
-    grd.addColorStop(0.1, "rgba(255, 200, 80, 0.05)");  // Halo (soft orange glow)
-    grd.addColorStop(1, "rgba(255, 120, 30, 0.0)");     // Fade out quickly
+    
+    // The light ITSELF creates the beautiful sunset colors over the dark sky.
+    // Alpha is multiplied by 8 layers.
+    grd.addColorStop(0, "rgba(255, 255, 255, 0.2)");      // Core white
+    grd.addColorStop(0.05, "rgba(255, 220, 100, 0.15)");  // Bright yellow
+    grd.addColorStop(0.2, "rgba(255, 120, 30, 0.12)");    // Vibrant orange
+    grd.addColorStop(0.5, "rgba(200, 40, 10, 0.08)");     // Deep red-orange
+    grd.addColorStop(1, "rgba(100, 10, 0, 0.0)");         // Fades to nothing
+    
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, size, size);
     
