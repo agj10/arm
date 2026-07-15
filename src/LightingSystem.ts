@@ -28,7 +28,7 @@ export class LightingSystem {
     canvas.height = size;
     const ctx = canvas.getContext('2d')!;
     const grd = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-    grd.addColorStop(0, "rgba(255, 170, 80, 0.035)"); // Very subtle per-layer (8 layers × 0.035 = 0.28 total)
+    grd.addColorStop(0, "rgba(255, 170, 80, 0.05)"); // Warm per-layer (8 layers × 0.05 = 0.4 total)
     grd.addColorStop(1, "rgba(255, 170, 80, 0.0)");   // Fade to transparent
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, size, size);

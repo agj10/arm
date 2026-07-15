@@ -221,13 +221,13 @@ class Game {
     }
 
     // Tree trunk physics colliders - cast shadows but don't block player movement
-    // CollisionGroups: membership=0x0002, filter=0x0000 → no physical interactions
-    for (let i = 0; i < 15; i++) {
-      const treeX = i * 8 - 10; // Spread across play area
-      const treeY = 10;         // Centered vertically above ground
+    // Positioned BELOW the light source so sunlight filters down through gaps
+    for (let i = 0; i < 10; i++) {
+      const treeX = i * 12 - 10; // Wider spacing, spread across play area
+      const treeY = -2;          // Center below light (extends y=-10 to y=6, light is at y~7.5)
       const treeBodyDesc = this.rapier.RigidBodyDesc.fixed().setTranslation(treeX, treeY);
       const treeBody = this.world.createRigidBody(treeBodyDesc);
-      const treeColDesc = this.rapier.ColliderDesc.cuboid(1.5, 20) // Thin tall trunk
+      const treeColDesc = this.rapier.ColliderDesc.cuboid(0.8, 8) // Thinner trunks
         .setCollisionGroups(0x00020000); // membership=2, filter=0 → won't collide with anything
       this.world.createCollider(treeColDesc, treeBody);
     }
