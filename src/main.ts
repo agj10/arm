@@ -95,11 +95,29 @@ class Game {
 
     this.skyLayer = new PIXI.Container();
     
-    // Draw a massive sunset Sun in the sky
+    // Beautiful Pastel Sky Gradient (Blue -> Pink -> Orange)
+    const skyCanvas = document.createElement('canvas');
+    skyCanvas.width = 1;
+    skyCanvas.height = 1024;
+    const skyCtx = skyCanvas.getContext('2d')!;
+    const skyGrd = skyCtx.createLinearGradient(0, 0, 0, 1024);
+    skyGrd.addColorStop(0, "#7ab8cc"); // Soft sky blue
+    skyGrd.addColorStop(0.3, "#c6a1c9"); // Soft pastel pink/lavender
+    skyGrd.addColorStop(0.6, "#ffaa66"); // Soft pastel orange
+    skyGrd.addColorStop(1, "#ffdd66"); // Soft golden yellow
+    skyCtx.fillStyle = skyGrd;
+    skyCtx.fillRect(0, 0, 1, 1024);
+    
+    const skyBg = new PIXI.Sprite(PIXI.Texture.from(skyCanvas));
+    skyBg.width = window.innerWidth * 2;
+    skyBg.height = window.innerHeight * 2;
+    skyBg.position.set(-window.innerWidth / 2, -window.innerHeight / 2);
+    this.skyLayer.addChild(skyBg);
+    
+    // Draw a sunset Sun in the sky
     const sun = new PIXI.Graphics();
-    sun.circle(0, 0, 200).fill({ color: 0xffffee }); // 2x+ larger sun
+    sun.circle(0, 0, 50).fill({ color: 0xffffff }); // Bright core
     sun.position.set(window.innerWidth * 0.7, window.innerHeight * 0.7);
-    // Glow is handled by LightingSystem
     
     this.skyLayer.addChild(sun);
     this.sunVisual = sun;
@@ -115,9 +133,23 @@ class Game {
     this.postProcessLayer.addChild(this.bgLayerMid);
     this.postProcessLayer.addChild(this.gameplayLayer);
     
-    // Dark Ambient Shadow (Sunset Twilight)
-    const shadowOverlay = new PIXI.Graphics();
-    shadowOverlay.rect(-50000, -50000, 100000, 100000).fill({ color: 0x221133, alpha: 0.45 }); // Lighter shadow
+    // Dark Ambient Shadow - Vertical Gradient
+    // Keeps the upper sky bright and pastel, darkens only the ground and lower objects
+    const shadowCanvas = document.createElement('canvas');
+    shadowCanvas.width = 1; shadowCanvas.height = 1024;
+    const sCtx = shadowCanvas.getContext('2d')!;
+    const sGrd = sCtx.createLinearGradient(0, 0, 0, 1024);
+    sGrd.addColorStop(0, "rgba(20, 10, 30, 0.0)");   // Transparent at sky
+    sGrd.addColorStop(0.35, "rgba(20, 10, 30, 0.05)"); // Very faint at horizon
+    sGrd.addColorStop(0.5, "rgba(20, 10, 30, 0.5)"); // Ground shadow
+    sGrd.addColorStop(1, "rgba(20, 10, 30, 0.8)");   // Deep underground
+    sCtx.fillStyle = sGrd;
+    sCtx.fillRect(0, 0, 1, 1024);
+    
+    const shadowOverlay = new PIXI.Sprite(PIXI.Texture.from(shadowCanvas));
+    shadowOverlay.position.set(-50000, -1000); // Start slightly above ground
+    shadowOverlay.width = 100000;
+    shadowOverlay.height = 4000; // Stretch to cover deep ground
     this.shadowLayer.addChild(shadowOverlay);
     
     this.shadowLayer.blendMode = 'multiply';
@@ -186,8 +218,8 @@ class Game {
     
     this.levelManager.update(deltaTime);
     
-    // Position the sun exactly half-submerged on the horizon (world Y = -10)
-    const sunWorldPos = new Vec2(this.cameraPos.x, -10);
+    // Position the sun high in the sky (300 pixels above screen center)
+    const sunWorldPos = new Vec2(this.cameraPos.x, this.cameraPos.y + 7.5);
     this.lightingSystem.update(sunWorldPos);
 
     // Parallax Camera System
@@ -201,8 +233,14 @@ class Game {
     const cx = (window.innerWidth / 2) / stageScale;
     const cy = (window.innerHeight / 2) / stageScale;
 
-    // Fix Sun to be exactly half-submerged on the horizon (gameplay Y = 400)
-    this.sunVisual.position.set(cx, this.gameplayLayer.y + 400);
+    // Fix Sky Background to screen
+    const skyBg = this.skyLayer.children[0] as PIXI.Sprite;
+    skyBg.width = window.innerWidth / stageScale;
+    skyBg.height = window.innerHeight / stageScale;
+    skyBg.position.set(0, 0);
+
+    // Fix Sun high in the sky (center X, top Y)
+    this.sunVisual.position.set(cx, cy - 300);
 
     this.gameplayLayer.x = cx - this.cameraPos.x * ppm;
     this.gameplayLayer.y = cy - (-this.cameraPos.y * ppm);
