@@ -30,12 +30,12 @@ export class LightingSystem {
     const grd = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
     
     // The light ITSELF creates the beautiful sunset colors over the dark sky.
-    // Use pastel/soft tones (golden yellow, peach, soft red) to be easy on the eyes.
-    grd.addColorStop(0, "rgba(255, 255, 230, 0.12)");     // Core: soft warm white
-    grd.addColorStop(0.1, "rgba(255, 220, 140, 0.08)");   // Inner halo: soft golden-yellow (pastel)
-    grd.addColorStop(0.3, "rgba(255, 160, 120, 0.05)");   // Mid sky: soft peachy-orange (pastel)
-    grd.addColorStop(0.6, "rgba(220, 100, 80, 0.03)");    // Outer sky: soft warm pinkish-red
-    grd.addColorStop(1, "rgba(100, 50, 50, 0.0)");        // Fade out smoothly
+    // Middle ground between intense vibrant colors and soft pastel tones.
+    grd.addColorStop(0, "rgba(255, 255, 225, 0.14)");     // Core: bright warm white
+    grd.addColorStop(0.08, "rgba(255, 200, 80, 0.08)");   // Inner halo: golden orange
+    grd.addColorStop(0.28, "rgba(255, 130, 60, 0.05)");   // Mid sky: warm sunset orange
+    grd.addColorStop(0.6, "rgba(210, 60, 40, 0.03)");     // Outer sky: soft sunset red
+    grd.addColorStop(1, "rgba(80, 30, 20, 0.0)");         // Fade out smoothly
     
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, size, size);
