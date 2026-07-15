@@ -37,19 +37,19 @@ class Game {
   private clawLayer!: PIXI.Container;
   private shadowLayer!: PIXI.Container;
   private lightLayer!: PIXI.Container;
+  private silhouetteLayer!: PIXI.Container;
+  private levelMaskContainer!: PIXI.Container;
+  private sunLayer!: PIXI.Container;
   private postProcessLayer!: PIXI.Container;
   
   private targetZoom: number = 1.0;
   private currentZoom: number = 1.0;
   
-  private silhouetteLayer!: PIXI.Container;
-  private levelMaskContainer!: PIXI.Container;
-
   // Input & State
   private isMouseDown = false;
   private mousePos = new Vec2();
   private cameraPos = new Vec2(0, 0);
-  private sunVisual!: PIXI.Container;
+  private sunVisual!: PIXI.Graphics;
 
   constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
@@ -100,9 +100,6 @@ class Game {
 
     this.skyLayer = new PIXI.Container();
     
-    this.sunVisual = new PIXI.Container();
-    this.skyLayer.addChild(this.sunVisual);
-    
     this.bgLayerFar = new PIXI.Container();
     this.bgLayerMid = new PIXI.Container();
     this.gameplayLayer = new PIXI.Container();
@@ -118,9 +115,34 @@ class Game {
         new PIXI.AlphaFilter({ alpha: 0.12 })
     ];
 
+    this.sunLayer = new PIXI.Container();
+    
+    // Create the sun visual
+    this.sunVisual = new PIXI.Graphics();
+    
+    // Draw sunrays
+    for (let i = 0; i < 24; i++) {
+        const angle = (i / 24) * Math.PI * 2;
+        this.sunVisual.moveTo(Math.cos(angle) * 80, Math.sin(angle) * 80);
+        this.sunVisual.lineTo(Math.cos(angle) * 3000, Math.sin(angle) * 3000);
+    }
+    this.sunVisual.stroke({ color: 0xffeedd, width: 6, alpha: 0.1 });
+    
+    // Outer glow
+    this.sunVisual.circle(0, 0, 120).fill({ color: 0xffaa00, alpha: 0.2 });
+    this.sunVisual.circle(0, 0, 80).fill({ color: 0xffdd66, alpha: 0.4 });
+    // Core
+    this.sunVisual.circle(0, 0, 50).fill({ color: 0xffffff });
+    
+    // Position matches lightOrigin (35, -45) * 40
+    this.sunVisual.position.set(35 * 40, 45 * 40);
+    
+    this.sunLayer.addChild(this.sunVisual);
+
     this.postProcessLayer.addChild(this.skyLayer);
     this.postProcessLayer.addChild(this.bgLayerFar);
     this.postProcessLayer.addChild(this.bgLayerMid);
+    this.postProcessLayer.addChild(this.sunLayer);
     this.postProcessLayer.addChild(this.gameplayLayer);
     this.postProcessLayer.addChild(this.clawLayer);
     
@@ -273,11 +295,9 @@ class Game {
     const cx = (window.innerWidth / 2) / stageScale;
     const cy = (window.innerHeight / 2) / stageScale;
 
-    this.sunVisual.position.set(cx, cy - 300);
-
     const layers = [
       this.gameplayLayer, this.clawLayer, this.shadowLayer, 
-      this.lightLayer, this.silhouetteLayer, this.levelMaskContainer
+      this.lightLayer, this.silhouetteLayer, this.levelMaskContainer, this.sunLayer
     ];
 
     layers.forEach(layer => {

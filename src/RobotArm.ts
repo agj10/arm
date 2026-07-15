@@ -4,7 +4,9 @@ import { Vec2 } from './Vec2';
 
 export class RobotArm {
   public bodyMesh: PIXI.Graphics;
-  public clawMesh: PIXI.Graphics;
+  private clawMesh: PIXI.Container;
+  private fingerL: PIXI.Graphics;
+  private fingerR: PIXI.Graphics;
   private armMeshes: PIXI.Graphics[] = [];
   private jointMeshes: PIXI.Graphics[] = [];
 
@@ -37,7 +39,7 @@ export class RobotArm {
     this.clawPos = new Vec2(0, -5);
 
     // Body
-    const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -1);
+    const rigidBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -1).lockRotations();
     this.rigidBody = world.createRigidBody(rigidBodyDesc);
     const colliderDesc = rapierModule.ColliderDesc.ball(0.8)
       .setMass(2.0).setCollisionGroups(0x00040008); // Casts shadow, no level collision
@@ -58,11 +60,22 @@ export class RobotArm {
       .setMass(0.5).setCollisionGroups(0x00020009); // Col Group 2, Mask Group 1 (Level) & Group 4 (Light)
     world.createCollider(clawColDesc, this.clawBody);
 
-    this.clawMesh = new PIXI.Graphics();
-    this.clawMesh.roundRect(-15, -15, 30, 15, 4).fill(0x3a3a3a);
-    this.clawMesh.poly([-15, 0, -20, 25, -10, 25, -5, 0]).fill(0x5a5a5a);
-    this.clawMesh.poly([15, 0, 20, 25, 10, 25, 5, 0]).fill(0x5a5a5a);
-    this.clawMesh.circle(0, -5, 6).fill(0xee8822);
+    this.clawMesh = new PIXI.Container();
+    
+    const base = new PIXI.Graphics();
+    base.rect(-15, -15, 30, 20).fill(0x334455);
+    base.circle(0, 0, 8).fill(0xffaa00);
+    this.clawMesh.addChild(base);
+
+    this.fingerL = new PIXI.Graphics();
+    this.fingerL.moveTo(0, 0).lineTo(-10, 20).lineTo(-5, 30).stroke({ color: 0x556677, width: 6, cap: 'round', join: 'round' });
+    this.fingerL.position.set(-15, 5);
+    this.clawMesh.addChild(this.fingerL);
+
+    this.fingerR = new PIXI.Graphics();
+    this.fingerR.moveTo(0, 0).lineTo(10, 20).lineTo(5, 30).stroke({ color: 0x556677, width: 6, cap: 'round', join: 'round' });
+    this.fingerR.position.set(15, 5);
+    this.clawMesh.addChild(this.fingerR);
     clawLayer.addChild(this.clawMesh);
 
     for (let i = 0; i < 3; i++) {
@@ -107,7 +120,7 @@ export class RobotArm {
     // Rope constraint between base and claw
     const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
     const jointParams = rapierModule.JointData.rope(maxDist, {x:0, y:0}, {x:0, y:0});
-    this.ropeJoint = world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
+    // Rope joint removed so body movement doesn't affect claw swing
   }
 
   public update(mousePos: Vec2, isMouseDown: boolean) {
@@ -127,102 +140,75 @@ export class RobotArm {
       if (this.detachCooldown <= 0) {
           const cPos = this.clawBody.translation();
           const dirs = [{x:0,y:-1}, {x:0,y:1}, {x:-1,y:0}, {x:1,y:0}];
-          let attachedPoint = null;
-          let attachedNormal = null;
           for (const d of dirs) {
             const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, d);
             const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
             const hit = this.world.castRay(ray, 0.8, true, filter);
             if (hit) {
-              attachedPoint = new Vec2(
-                ray.origin.x + ray.dir.x * hit.timeOfImpact,
-                ray.origin.y + ray.dir.y * hit.timeOfImpact
-              );
-              attachedNormal = d;
+              this.isAttached = true;
+              this.clawPos.set(ray.origin.x + ray.dir.x * hit.timeOfImpact, ray.origin.y + ray.dir.y * hit.timeOfImpact);
+              this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
+              this.clawBody.setTranslation({ x: this.clawPos.x, y: this.clawPos.y }, true);
+              const R = Math.atan2(-d.y, d.x) - Math.PI / 2;
+              this.clawBody.setRotation(-R, true);
               break;
             }
           }
-
-          if (attachedPoint && attachedNormal) { 
-            this.isAttached = true;
-            this.clawPos.set(attachedPoint.x, attachedPoint.y); 
-            this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
-            this.clawBody.setTranslation({ x: attachedPoint.x, y: attachedPoint.y }, true);
-            this.clawBody.setLinvel({ x: 0, y: 0 }, true);
-            
-            const R = Math.atan2(-attachedNormal.y, attachedNormal.x) - Math.PI / 2;
-            this.clawBody.setRotation(-R, true);
-          }
       }
-      
       if (!this.isAttached) {
-          const cPos = this.clawBody.translation();
-          this.clawPos.set(cPos.x, cPos.y);
-          
-          const vel = this.clawBody.linvel();
-          if (Math.abs(vel.x) > 0.1 || Math.abs(vel.y) > 0.1) {
-              const R = Math.atan2(-vel.y, vel.x) - Math.PI / 2;
-              this.clawBody.setRotation(-R, true);
-          }
-      }
+        const cPos = this.clawBody.translation();
+        this.clawPos.set(cPos.x, cPos.y);
+        
+        const vel = this.clawBody.linvel();
+        if (Math.abs(vel.x) > 0.1 || Math.abs(vel.y) > 0.1) {
+            const R = Math.atan2(-vel.y, vel.x) - Math.PI / 2;
+            this.clawBody.setRotation(-R, true);
+        }
     } else {
-      // Attached state
       this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
       this.clawBody.setTranslation({ x: this.clawPos.x, y: this.clawPos.y }, true);
 
       if (this.prevIsMouseDown && !isMouseDown) {
-         // Released! Detach and shoot claw!
          this.isAttached = false;
          this.detachCooldown = 15; 
          this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
-         
          const cPos = this.clawBody.translation();
          const dir = new Vec2(mousePos.x - cPos.x, mousePos.y - cPos.y).normalize();
          this.clawBody.setLinvel({ x: dir.x * 80, y: dir.y * 80 }, true);
-      } else {
-         // Follow point-symmetric target smoothly
-         let targetPos = new Vec2(
-             this.clawPos.x - (mousePos.x - this.clawPos.x),
-             this.clawPos.y - (mousePos.y - this.clawPos.y)
-         );
-         
-         if (targetPos.distanceTo(this.clawPos) > maxDist) {
-             const dir = targetPos.clone().sub(this.clawPos).normalize();
-             targetPos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
-         }
-         
-         const baseVel = this.rigidBody.linvel();
-         const targetVx = (targetPos.x - basePos.x) * 14;
-         const targetVy = (targetPos.y - basePos.y) * 12;
-         
-         const lerpFactor = 0.2; 
-         this.rigidBody.setLinvel({
-             x: baseVel.x + (targetVx - baseVel.x) * lerpFactor,
-             y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
-         }, true);
       }
     }
 
-    // Abyss safety net
-    if (basePos.y <= -1499.1 && basePos.x >= 150) { 
-      this.isAttached = true;
-      this.clawPos.set(basePos.x, -1500);
-      this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
-      this.clawBody.setTranslation({ x: basePos.x, y: -1500 }, true);
+    const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
+    let targetPos = new Vec2(this.clawPos.x - (mousePos.x - this.clawPos.x), this.clawPos.y - (mousePos.y - this.clawPos.y));
+    if (targetPos.distanceTo(this.clawPos) > maxDist) {
+        const dir = targetPos.clone().sub(this.clawPos).normalize();
+        targetPos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
     }
+    
+    const baseVel = this.rigidBody.linvel();
+    this.rigidBody.setLinvel({
+        x: baseVel.x + ((targetPos.x - basePos.x) * 14 - baseVel.x) * 0.2,
+        y: baseVel.y + ((targetPos.y - basePos.y) * 12 - baseVel.y) * 0.2
+    }, true);
 
     this.prevIsMouseDown = isMouseDown;
-    
-    // Update visuals - Sync perfectly with physics
     const pos = this.rigidBody.translation();
     this.bodyMesh.position.set(pos.x * 40, -pos.y * 40); 
     this.bodyMesh.rotation = -this.rigidBody.rotation();
-    this.silBodyMesh.position.copyFrom(this.bodyMesh.position);
+    this.silBodyMesh.position.set(pos.x * 40, -pos.y * 40);
     this.silBodyMesh.rotation = this.bodyMesh.rotation;
-
+    
     this.clawMesh.position.set(this.clawPos.x * 40, -this.clawPos.y * 40);
     this.clawMesh.rotation = -this.clawBody.rotation();
+
+    if (this.isAttached) {
+        this.fingerL.rotation = Math.PI / 8;
+        this.fingerR.rotation = -Math.PI / 8;
+    } else {
+        this.fingerL.rotation = 0;
+        this.fingerR.rotation = 0;
+    }
 
     this.updateIK();
   }
