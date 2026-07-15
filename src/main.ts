@@ -34,6 +34,7 @@ class Game {
   private bgLayerFar!: PIXI.Container;
   private bgLayerMid!: PIXI.Container;
   private gameplayLayer!: PIXI.Container;
+  private clawLayer!: PIXI.Container;
   private shadowLayer!: PIXI.Container;
   private lightLayer!: PIXI.Container;
   private postProcessLayer!: PIXI.Container;
