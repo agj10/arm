@@ -99,7 +99,7 @@ export class LightingSystem {
         const angle = (i / this.rayCount) * Math.PI * 2;
         const dir = { x: Math.cos(angle), y: Math.sin(angle) };
         const ray = new this.rapier.Ray({ x: originX, y: originY }, dir);
-        const hit = this.world.castRay(ray, this.maxDistance, false, filterFlags, 0x00080007);
+        const hit = this.world.castRay(ray, this.maxDistance, true, filterFlags, 0x00080007);
 
         let hitDist = this.maxDistance;
         if (hit) {
