@@ -209,6 +209,39 @@ class Game {
     w2Mask.position.set(4800 * 40, 500 * 40);
     this.levelMaskContainer.addChild(w2Mask);
 
+    // Test Platform 1
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(10, 2), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(30, 10)));
+    const p1Vis = new PIXI.Graphics();
+    p1Vis.rect(-10 * 40, -2 * 40, 20 * 40, 4 * 40).fill(0x775555);
+    p1Vis.position.set(30 * 40, -10 * 40);
+    this.gameplayLayer.addChild(p1Vis);
+    const p1Mask = new PIXI.Graphics();
+    p1Mask.rect(-10 * 40, -2 * 40, 20 * 40, 4 * 40).fill(0xffffff);
+    p1Mask.position.set(30 * 40, -10 * 40);
+    this.levelMaskContainer.addChild(p1Mask);
+
+    // Test Platform 2 (Large Block)
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 15), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(60, 5)));
+    const p2Vis = new PIXI.Graphics();
+    p2Vis.rect(-5 * 40, -15 * 40, 10 * 40, 30 * 40).fill(0x555577);
+    p2Vis.position.set(60 * 40, -5 * 40);
+    this.gameplayLayer.addChild(p2Vis);
+    const p2Mask = new PIXI.Graphics();
+    p2Mask.rect(-5 * 40, -15 * 40, 10 * 40, 30 * 40).fill(0xffffff);
+    p2Mask.position.set(60 * 40, -5 * 40);
+    this.levelMaskContainer.addChild(p2Mask);
+
+    // Test Platform 3 (Giant Ceiling Object)
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(40, 10), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(120, 30)));
+    const p3Vis = new PIXI.Graphics();
+    p3Vis.rect(-40 * 40, -10 * 40, 80 * 40, 20 * 40).fill(0x444444);
+    p3Vis.position.set(120 * 40, -30 * 40);
+    this.gameplayLayer.addChild(p3Vis);
+    const p3Mask = new PIXI.Graphics();
+    p3Mask.rect(-40 * 40, -10 * 40, 80 * 40, 20 * 40).fill(0xffffff);
+    p3Mask.position.set(120 * 40, -30 * 40);
+    this.levelMaskContainer.addChild(p3Mask);
+
     // Ceiling
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(0, 60)));
     const cMask = new PIXI.Graphics();

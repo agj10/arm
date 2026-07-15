@@ -55,7 +55,7 @@ export class RobotArm {
     const clawBodyDesc = rapierModule.RigidBodyDesc.dynamic().setTranslation(0, -5).setLinearDamping(0.5);
     this.clawBody = world.createRigidBody(clawBodyDesc);
     const clawColDesc = rapierModule.ColliderDesc.cuboid(0.6, 0.6)
-      .setMass(0.5).setCollisionGroups(0x00020001); // Col Group 2, Mask Group 1 (Level)
+      .setMass(0.5).setCollisionGroups(0x00020009); // Col Group 2, Mask Group 1 (Level) & Group 4 (Light)
     world.createCollider(clawColDesc, this.clawBody);
 
     this.clawMesh = new PIXI.Graphics();
