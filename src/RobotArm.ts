@@ -133,12 +133,12 @@ export class RobotArm {
       // Auto-attach on collision with any fixed geometry
       if (this.detachCooldown <= 0) {
           const cPos = this.clawBody.translation();
-          const dirs = [{x:0,y:-0.7}, {x:0,y:0.7}, {x:-0.7,y:0}, {x:0.7,y:0}];
+          const dirs = [{x:0,y:-1}, {x:0,y:1}, {x:-1,y:0}, {x:1,y:0}];
           let attachedPoint = null;
           for (const d of dirs) {
             const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, d);
             const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
-            const hit = this.world.castRay(ray, 0.7, true, filter);
+            const hit = this.world.castRay(ray, 0.8, true, filter);
             if (hit) {
               attachedPoint = new Vec2(
                 ray.origin.x + ray.dir.x * hit.timeOfImpact,
@@ -168,10 +168,14 @@ export class RobotArm {
       this.clawBody.setTranslation({ x: this.clawPos.x, y: this.clawPos.y }, true);
 
       if (this.prevIsMouseDown && !isMouseDown) {
-         // Released! Detach and swing out!
+         // Released! Detach and shoot claw!
          this.isAttached = false;
          this.detachCooldown = 15; 
          this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
+         
+         const cPos = this.clawBody.translation();
+         const dir = new Vec2(mousePos.x - cPos.x, mousePos.y - cPos.y).normalize();
+         this.clawBody.setLinvel({ x: dir.x * 60, y: dir.y * 60 }, true);
       } else {
          // Follow point-symmetric target smoothly
          let targetPos = new Vec2(

@@ -117,6 +117,10 @@ class Game {
     this.postProcessLayer.addChild(this.bgLayerFar);
     this.postProcessLayer.addChild(this.bgLayerMid);
     this.postProcessLayer.addChild(this.gameplayLayer);
+    
+    this.postProcessLayer.addChild(this.levelMaskContainer);
+    this.levelMaskContainer.renderable = false; // Hide it, but keep it in the tree for transforms
+
     this.postProcessLayer.addChild(this.silhouetteLayer);
     
     const shadowOverlay = new PIXI.Graphics();
