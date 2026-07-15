@@ -117,7 +117,7 @@ class Game {
     
     // Dark Ambient Shadow (Sunset Twilight)
     const shadowOverlay = new PIXI.Graphics();
-    shadowOverlay.rect(-5000, -5000, 10000, 10000).fill({ color: 0x221133, alpha: 0.65 }); // Brighter shadow
+    shadowOverlay.rect(-50000, -50000, 100000, 100000).fill({ color: 0x221133, alpha: 0.45 }); // Lighter shadow
     this.shadowLayer.addChild(shadowOverlay);
     
     this.shadowLayer.blendMode = 'multiply';
