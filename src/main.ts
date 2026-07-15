@@ -6,7 +6,7 @@ import { LevelManager } from './LevelManager';
 import { LightingSystem } from './LightingSystem';
 import { Vec2 } from './Vec2';
 import * as RAPIER from '@dimforge/rapier2d';
-import { AdvancedBloomFilter, AdjustmentFilter, GlowFilter } from 'pixi-filters';
+import { AdvancedBloomFilter, AdjustmentFilter, GlowFilter, NoiseFilter } from 'pixi-filters';
 
 // Fetch and display version
 fetch('/version.json')
@@ -49,7 +49,8 @@ class Game {
   private isMouseDown = false;
   private mousePos = new Vec2();
   private cameraPos = new Vec2(0, 0);
-  private sunVisual!: PIXI.Container;
+  private sunLayer!: PIXI.Container;
+  private sunVisual!: PIXI.Sprite;
 
   constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
@@ -85,6 +86,11 @@ class Game {
       brightness: 1.1,
     });
 
+    const noiseFilter = new NoiseFilter({
+      noise: 0.04, // Breaks up color banding in the sky
+      seed: Math.random()
+    });
+
     this.postProcessLayer = new PIXI.Container();
     this.app.stage.addChild(this.postProcessLayer);
     this.postProcessLayer.filters = [
@@ -95,17 +101,12 @@ class Game {
         blur: 4,
         quality: 4
       }),
-      adjustmentFilter
+      adjustmentFilter,
+      noiseFilter
     ];
 
     this.skyLayer = new PIXI.Container();
-    
-    const sun = new PIXI.Graphics();
-    sun.circle(0, 0, 150).fill({ color: 0xffaa55, alpha: 0.1 });
-    sun.circle(0, 0, 100).fill({ color: 0xffdd88, alpha: 0.3 });
-    sun.circle(0, 0, 60).fill({ color: 0xffffee });
-    this.skyLayer.addChild(sun);
-    this.sunVisual = sun;
+    this.sunLayer = new PIXI.Container();
     
     this.bgLayerFar = new PIXI.Container();
     this.bgLayerMid = new PIXI.Container();
@@ -125,6 +126,7 @@ class Game {
     this.postProcessLayer.addChild(this.skyLayer);
     this.postProcessLayer.addChild(this.bgLayerFar);
     this.postProcessLayer.addChild(this.bgLayerMid);
+    this.postProcessLayer.addChild(this.sunLayer);
     this.postProcessLayer.addChild(this.gameplayLayer);
     this.postProcessLayer.addChild(this.clawLayer);
     
@@ -144,6 +146,12 @@ class Game {
     this.lightingSystem = new LightingSystem(this.world, this.rapier);
     this.lightLayer = this.lightingSystem.lightContainer;
     this.postProcessLayer.addChild(this.lightLayer);
+
+    // Create the persistent visual sun using the beautiful lighting texture
+    this.sunVisual = new PIXI.Sprite(this.lightingSystem.lightTexture);
+    this.sunVisual.anchor.set(0.5);
+    this.sunVisual.blendMode = 'add';
+    this.sunLayer.addChild(this.sunVisual);
 
     // Add silhouette on top of shadows and lights so it glows clearly
     this.postProcessLayer.addChild(this.silhouetteLayer);
@@ -201,20 +209,20 @@ class Game {
     this.levelMaskContainer.addChild(f1Mask);
 
     // Walls
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-200, -500)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000).setCollisionGroups(0x00010003), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(-200, -500)));
     const w1Mask = new PIXI.Graphics();
     w1Mask.rect(-5 * 40, -1000 * 40, 10 * 40, 2000 * 40).fill(0xffffff);
     w1Mask.position.set(-200 * 40, 500 * 40); // Y is flipped visually
     this.levelMaskContainer.addChild(w1Mask);
 
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(4800, -500)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5, 1000).setCollisionGroups(0x00010003), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(4800, -500)));
     const w2Mask = new PIXI.Graphics();
     w2Mask.rect(-5 * 40, -1000 * 40, 10 * 40, 2000 * 40).fill(0xffffff);
     w2Mask.position.set(4800 * 40, 500 * 40);
     this.levelMaskContainer.addChild(w2Mask);
 
     // Ceiling
-    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5).setCollisionGroups(0x0001000b), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(0, 60)));
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5).setCollisionGroups(0x00010003), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(0, 60)));
     const cMask = new PIXI.Graphics();
     cMask.rect(-5000 * 40, -5 * 40, 10000 * 40, 10 * 40).fill(0xffffff);
     cMask.position.set(0, -60 * 40);
@@ -229,8 +237,18 @@ class Game {
     
     this.levelManager.update(deltaTime);
     
+    // Update lighting system
     const sunWorldPos = new Vec2(this.cameraPos.x, this.cameraPos.y + 7.5);
     this.lightingSystem.update(sunWorldPos);
+
+    // Sync sunLayer transform exactly with lightLayer so the sun texture aligns perfectly with volumetric rays
+    this.sunLayer.scale.set(this.currentZoom);
+    this.sunLayer.position.set(
+      window.innerWidth / 2 - this.cameraPos.x * 40 * this.currentZoom,
+      window.innerHeight / 2 + this.cameraPos.y * 40 * this.currentZoom
+    );
+    // Position the visual sun exactly at the raycast origin (in pixel coordinates)
+    this.sunVisual.position.set(sunWorldPos.x * 40, -sunWorldPos.y * 40);
 
     const targetCamX = this.robotArm.clawPos.x;
     const targetCamY = this.robotArm.clawPos.y; 

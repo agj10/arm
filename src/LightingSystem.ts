@@ -9,7 +9,7 @@ export class LightingSystem {
   public lightContainer: PIXI.Container;
   private lightMeshes: PIXI.Mesh[] = [];
   private lightGeometries: PIXI.Geometry[] = [];
-  private lightTexture: PIXI.Texture;
+  public lightTexture: PIXI.Texture;
 
   private rayCount: number = 360; // 360 is plenty for smooth shadows
   private maxDistance: number = 80; // 80m = 3200px, enough to cover entire screen even when zoomed out
@@ -31,8 +31,8 @@ export class LightingSystem {
     
     // The light ITSELF creates the beautiful sunset colors over the dark sky.
     // Middle ground between intense vibrant colors and soft pastel tones.
-    grd.addColorStop(0, "rgba(255, 220, 100, 0.06)");     // Core: soft warm glow instead of harsh white
-    grd.addColorStop(0.08, "rgba(255, 180, 70, 0.05)");   // Inner halo: golden orange
+    grd.addColorStop(0, "rgba(255, 255, 225, 0.14)");     // Core: bright warm white
+    grd.addColorStop(0.08, "rgba(255, 200, 80, 0.08)");   // Inner halo: golden orange
     grd.addColorStop(0.28, "rgba(255, 130, 60, 0.05)");   // Mid sky: warm sunset orange
     grd.addColorStop(0.6, "rgba(210, 60, 40, 0.03)");     // Outer sky: soft sunset red
     grd.addColorStop(1, "rgba(80, 30, 20, 0.0)");         // Fade out smoothly
