@@ -118,23 +118,21 @@ class Game {
     this.postProcessLayer.addChild(this.bgLayerMid);
     this.postProcessLayer.addChild(this.gameplayLayer);
     
-    this.postProcessLayer.addChild(this.levelMaskContainer);
-    this.levelMaskContainer.renderable = false; // Hide it, but keep it in the tree for transforms
-
-    this.postProcessLayer.addChild(this.silhouetteLayer);
-    
     const shadowOverlay = new PIXI.Graphics();
     shadowOverlay.rect(-50000, -50000, 100000, 100000).fill({ color: 0x221133, alpha: 0.45 });
     this.shadowLayer.addChild(shadowOverlay);
     this.shadowLayer.blendMode = 'multiply';
     this.postProcessLayer.addChild(this.shadowLayer);
 
-    const gravity = { x: 0.0, y: -30.0 };
+    const gravity = { x: 0.0, y: -60.0 };
     this.world = new this.rapier.World(gravity);
 
     this.lightingSystem = new LightingSystem(this.world, this.rapier);
     this.lightLayer = this.lightingSystem.lightContainer;
     this.postProcessLayer.addChild(this.lightLayer);
+
+    // Add silhouette on top of shadows and lights so it glows clearly
+    this.postProcessLayer.addChild(this.silhouetteLayer);
 
     // Create Robot Arm
     this.robotArm = new RobotArm(this.gameplayLayer, this.silhouetteLayer, this.world, this.rapier);

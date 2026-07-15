@@ -175,7 +175,7 @@ export class RobotArm {
          
          const cPos = this.clawBody.translation();
          const dir = new Vec2(mousePos.x - cPos.x, mousePos.y - cPos.y).normalize();
-         this.clawBody.setLinvel({ x: dir.x * 60, y: dir.y * 60 }, true);
+         this.clawBody.setLinvel({ x: dir.x * 80, y: dir.y * 80 }, true);
       } else {
          // Follow point-symmetric target smoothly
          let targetPos = new Vec2(
