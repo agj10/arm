@@ -177,10 +177,10 @@ export class RobotArm {
           }
           
           const baseVel = this.rigidBody.linvel();
-          const targetVx = (targetPos.x - basePos.x) * 14;
-          const targetVy = (targetPos.y - basePos.y) * 12;
+          const targetVx = (targetPos.x - basePos.x) * 4;
+          const targetVy = (targetPos.y - basePos.y) * 3;
           
-          const lerpFactor = 0.2;
+          const lerpFactor = 0.08;
           this.rigidBody.setLinvel({
               x: baseVel.x + (targetVx - baseVel.x) * lerpFactor,
               y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
