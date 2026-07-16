@@ -71,7 +71,7 @@ export class LightingSystem {
 
   public update(lightPos: Vec2) {
     const samples = 8;
-    const lightRadius = 1.5; // Wider spread prevents small objects from completely eclipsing the light
+    const lightRadius = 1.5; // Large enough so the claw can't completely eclipse the light
     const maxPixelDist = this.maxDistance * 40;
     
     // Only exclude sensors (arm segment colliders) - let player body/claw cast shadows
@@ -79,33 +79,36 @@ export class LightingSystem {
 
     for (let s = 0; s < samples; s++) {
       const sampleAngle = (s / samples) * Math.PI * 2;
-      const offsetX = Math.cos(sampleAngle) * lightRadius;
-      const offsetY = Math.sin(sampleAngle) * lightRadius;
-
-      const originX = lightPos.x + offsetX;
-      const originY = lightPos.y + offsetY;
+      const originX = lightPos.x + Math.cos(sampleAngle) * lightRadius;
+      const originY = lightPos.y + Math.sin(sampleAngle) * lightRadius;
 
       const geom = this.lightGeometries[s];
       const vertices = geom.getBuffer('aPosition').data as Float32Array;
       const uvs = geom.getBuffer('aUV').data as Float32Array;
-
-      // Center vertex in world coordinates
+      
+      // Center vertex
       vertices[0] = originX * 40;
       vertices[1] = -originY * 40;
-      uvs[0] = 0.5;
-      uvs[1] = 0.5;
+      
+      // Map UVs relative to the absolute lightPos, NOT the offset origin!
+      // This ensures all 8 sample meshes share the exact same perfectly aligned texture, eliminating lumpiness.
+      const centerLocalX = (originX - lightPos.x) * 40;
+      const centerLocalY = (-originY - (-lightPos.y)) * 40;
+      uvs[0] = 0.5 + (centerLocalX / maxPixelDist) * 0.5;
+      uvs[1] = 0.5 + (centerLocalY / maxPixelDist) * 0.5;
 
       for (let i = 0; i < this.rayCount; i++) {
         const angle = (i / this.rayCount) * Math.PI * 2;
         const dir = { x: Math.cos(angle), y: Math.sin(angle) };
         const ray = new this.rapier.Ray({ x: originX, y: originY }, dir);
+        
+        // Solid=true ensures rays starting inside colliders hit immediately at toi=0
         const hit = this.world.castRay(ray, this.maxDistance, true, filterFlags, 0x00080007);
-
         let hitDist = this.maxDistance;
         if (hit) {
           hitDist = hit.timeOfImpact;
         }
-        
+
         const hitX = originX + dir.x * hitDist;
         const hitY = originY + dir.y * hitDist;
 
@@ -114,9 +117,9 @@ export class LightingSystem {
         vertices[vIdx] = hitX * 40;
         vertices[vIdx + 1] = -hitY * 40;
 
-        // UV mapping relative to maxDistance
-        const localX = (hitX - originX) * 40;
-        const localY = (-hitY - (-originY)) * 40;
+        // UV mapping relative to the absolute lightPos
+        const localX = (hitX - lightPos.x) * 40;
+        const localY = (-hitY - (-lightPos.y)) * 40;
         
         uvs[vIdx] = 0.5 + (localX / maxPixelDist) * 0.5;
         uvs[vIdx + 1] = 0.5 + (localY / maxPixelDist) * 0.5;
