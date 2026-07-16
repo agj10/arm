@@ -50,7 +50,7 @@ class Game {
   private mousePos = new Vec2();
   private cameraPos = new Vec2(0, 0);
   private sunLayer!: PIXI.Container;
-  private sunVisual!: PIXI.Container;
+  private sunVisual!: PIXI.Sprite;
 
   constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
@@ -148,16 +148,12 @@ class Game {
     this.postProcessLayer.addChild(this.lightLayer);
 
     // Create the persistent visual sun using the beautiful lighting texture
-    this.sunVisual = new PIXI.Container();
-    for(let i=0; i<4; i++) {
-        const sprite = new PIXI.Sprite(this.lightingSystem.lightTexture);
-        sprite.anchor.set(0.5);
-        sprite.blendMode = 'add';
-        // maxDistance is 80 (3200px radius), texture is 4096px (2048px radius)
-        // 3200 / 2048 = 1.5625
-        sprite.scale.set(1.5625);
-        this.sunVisual.addChild(sprite);
-    }
+    this.sunVisual = new PIXI.Sprite(this.lightingSystem.sunTexture);
+    this.sunVisual.anchor.set(0.5);
+    this.sunVisual.blendMode = 'add';
+    // maxDistance is 80 (3200px radius), texture is 4096px (2048px radius)
+    // 3200 / 2048 = 1.5625
+    this.sunVisual.scale.set(1.5625);
     this.sunLayer.addChild(this.sunVisual);
 
     // Add silhouette on top of shadows and lights so it glows clearly

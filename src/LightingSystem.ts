@@ -10,6 +10,7 @@ export class LightingSystem {
   private lightMeshes: PIXI.Mesh[] = [];
   private lightGeometries: PIXI.Geometry[] = [];
   public lightTexture: PIXI.Texture;
+  public sunTexture: PIXI.Texture;
 
   private rayCount: number = 360; // 360 is plenty for smooth shadows
   private maxDistance: number = 80; // 80m = 3200px, enough to cover entire screen even when zoomed out
@@ -21,26 +22,35 @@ export class LightingSystem {
     this.lightContainer = new PIXI.Container();
     this.lightContainer.blendMode = 'add';
     
-    // Create a massive smooth radial gradient texture for the sunset
-    const canvas = document.createElement('canvas');
     const size = 4096;
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d')!;
-    const grd = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
     
-    // The light ITSELF creates the beautiful sunset colors over the dark sky.
-    // Middle ground between intense vibrant colors and soft pastel tones.
-    grd.addColorStop(0, "rgba(255, 255, 225, 0.14)");     // Core: bright warm white
-    grd.addColorStop(0.08, "rgba(255, 200, 80, 0.08)");   // Inner halo: golden orange
-    grd.addColorStop(0.28, "rgba(255, 130, 60, 0.05)");   // Mid sky: warm sunset orange
-    grd.addColorStop(0.6, "rgba(210, 60, 40, 0.03)");     // Outer sky: soft sunset red
-    grd.addColorStop(1, "rgba(80, 30, 20, 0.0)");         // Fade out smoothly
-    
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, size, size);
-    
-    this.lightTexture = PIXI.Texture.from(canvas);
+    // Texture 1: Volumetric Rays (Soft, dim, additive)
+    const canvas1 = document.createElement('canvas');
+    canvas1.width = size;
+    canvas1.height = size;
+    const ctx1 = canvas1.getContext('2d')!;
+    const grd1 = ctx1.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    grd1.addColorStop(0, "rgba(255, 200, 100, 0.04)");   // Dim core, so overlapping 8 times isn't overwhelming
+    grd1.addColorStop(0.3, "rgba(255, 130, 60, 0.02)");  // Soft orange spread
+    grd1.addColorStop(1, "rgba(80, 30, 20, 0.0)");       // Fade out smoothly
+    ctx1.fillStyle = grd1;
+    ctx1.fillRect(0, 0, size, size);
+    this.lightTexture = PIXI.Texture.from(canvas1);
+
+    // Texture 2: Visual Sun (Solid, bright, persistent)
+    const canvas2 = document.createElement('canvas');
+    canvas2.width = size;
+    canvas2.height = size;
+    const ctx2 = canvas2.getContext('2d')!;
+    const grd2 = ctx2.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    grd2.addColorStop(0, "rgba(255, 255, 255, 1.0)");      // Solid white core (never shrinks)
+    grd2.addColorStop(0.04, "rgba(255, 255, 220, 1.0)");   // Bright yellow core edge
+    grd2.addColorStop(0.1, "rgba(255, 180, 50, 0.6)");     // Golden halo
+    grd2.addColorStop(0.3, "rgba(200, 60, 20, 0.2)");      // Soft orange spread
+    grd2.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+    ctx2.fillStyle = grd2;
+    ctx2.fillRect(0, 0, size, size);
+    this.sunTexture = PIXI.Texture.from(canvas2);
 
     // Indices never change
     const indices = new Uint32Array(this.rayCount * 3);
