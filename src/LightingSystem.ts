@@ -81,7 +81,7 @@ export class LightingSystem {
 
   public update(lightPos: Vec2) {
     const samples = 8;
-    const lightRadius = 1.5; // Large enough so the claw can't completely eclipse the light
+    const lightRadius = 0.4; // Small enough to avoid visible stepping, sunVisual handles visual size
     const maxPixelDist = this.maxDistance * 40;
     
     // Only exclude sensors (arm segment colliders) - let player body/claw cast shadows

@@ -30,6 +30,7 @@ class Game {
   private lightingSystem!: LightingSystem;
 
   // Parallax Layers
+  private skyBg!: PIXI.Sprite;
 
   private bgLayerFar!: PIXI.Container;
   private bgLayerMid!: PIXI.Container;
@@ -68,7 +69,7 @@ class Game {
     await this.app.init({ 
       width: window.innerWidth, 
       height: window.innerHeight, 
-      backgroundColor: 0x22110a,
+      backgroundColor: 0xcc7733,
       resizeTo: window,
       antialias: false
     });
@@ -101,6 +102,22 @@ class Game {
 
     this.sunLayer = new PIXI.Container();
     
+    // Sky background: orange top → sky blue bottom with gradient
+    const skyCanvas = document.createElement('canvas');
+    skyCanvas.width = 1;
+    skyCanvas.height = 512;
+    const skyCtx = skyCanvas.getContext('2d')!;
+    const skyGrd = skyCtx.createLinearGradient(0, 0, 0, 512);
+    skyGrd.addColorStop(0, '#cc7733');    // Warm orange (top)
+    skyGrd.addColorStop(0.55, '#cc7733'); // Orange continues past midpoint
+    skyGrd.addColorStop(0.75, '#7799bb'); // Gradient transition zone
+    skyGrd.addColorStop(1, '#5588aa');    // Sky blue (bottom)
+    skyCtx.fillStyle = skyGrd;
+    skyCtx.fillRect(0, 0, 1, 512);
+    this.skyBg = new PIXI.Sprite(PIXI.Texture.from(skyCanvas));
+    this.skyBg.anchor.set(0, 0);
+    this.postProcessLayer.addChild(this.skyBg);
+    
     this.bgLayerFar = new PIXI.Container();
     this.bgLayerMid = new PIXI.Container();
     this.gameplayLayer = new PIXI.Container();
@@ -127,7 +144,7 @@ class Game {
     this.postProcessLayer.addChild(this.levelMaskContainer);
     
     const shadowOverlay = new PIXI.Graphics();
-    shadowOverlay.rect(-50000, -50000, 100000, 100000).fill({ color: 0x221133, alpha: 0.45 });
+    shadowOverlay.rect(-50000, -50000, 100000, 100000).fill({ color: 0x111122, alpha: 0.7 });
     this.shadowLayer.addChild(shadowOverlay);
     this.shadowLayer.blendMode = 'multiply';
     this.postProcessLayer.addChild(this.shadowLayer);
@@ -270,6 +287,10 @@ class Game {
     this.bgLayerFar.scale.set(zoom);
     this.bgLayerFar.x = cx - this.cameraPos.x * ppm * zoom * 0.1 - 2500 * zoom;
     this.bgLayerFar.y = cy - (-this.cameraPos.y * ppm * zoom * 0.1) - 1000 * zoom;
+
+    // Sky background always fills the entire screen (in stage coordinates, stage is scaled 0.5x)
+    this.skyBg.width = window.innerWidth / stageScale;
+    this.skyBg.height = window.innerHeight / stageScale;
   }
 }
 
