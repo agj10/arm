@@ -248,12 +248,6 @@ class Game {
     const sunWorldPos = new Vec2(this.cameraPos.x, this.cameraPos.y + 7.5);
     this.lightingSystem.update(sunWorldPos);
 
-    // Sync sunLayer transform exactly with lightLayer so the sun texture aligns perfectly with volumetric rays
-    this.sunLayer.scale.set(this.currentZoom);
-    this.sunLayer.position.set(
-      window.innerWidth / 2 - this.cameraPos.x * 40 * this.currentZoom,
-      window.innerHeight / 2 + this.cameraPos.y * 40 * this.currentZoom
-    );
     // Position the visual sun exactly at the raycast origin (in pixel coordinates)
     this.sunVisual.position.set(sunWorldPos.x * 40, -sunWorldPos.y * 40);
 
@@ -274,7 +268,8 @@ class Game {
       noiseFilter.seed = Math.random();
     }    const layers = [
       this.gameplayLayer, this.clawLayer, this.shadowLayer, 
-      this.lightLayer, this.silhouetteLayer, this.levelMaskContainer
+      this.lightLayer, this.silhouetteLayer, this.levelMaskContainer,
+      this.sunLayer
     ];
 
     layers.forEach(layer => {
