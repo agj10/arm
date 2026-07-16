@@ -68,7 +68,7 @@ class Game {
     await this.app.init({ 
       width: window.innerWidth, 
       height: window.innerHeight, 
-      backgroundColor: 0xd4803a,
+      backgroundColor: 0xaa5533,
       resizeTo: window,
       antialias: false
     });
@@ -129,7 +129,7 @@ class Game {
     this.postProcessLayer.addChild(this.levelMaskContainer);
     
     const shadowOverlay = new PIXI.Graphics();
-    shadowOverlay.rect(-50000, -50000, 100000, 100000).fill({ color: 0x332244, alpha: 0.3 });
+    shadowOverlay.rect(-50000, -50000, 100000, 100000).fill({ color: 0x221133, alpha: 0.45 });
     this.shadowLayer.addChild(shadowOverlay);
     this.shadowLayer.blendMode = 'multiply';
     this.postProcessLayer.addChild(this.shadowLayer);

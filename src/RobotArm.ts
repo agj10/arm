@@ -164,6 +164,27 @@ export class RobotArm {
               const R = Math.atan2(-vel.y, vel.x) - Math.PI / 2;
               this.clawBody.setRotation(-R, true);
           }
+
+          // Point-symmetric body movement: body goes opposite to mouse relative to claw
+          let targetPos = new Vec2(
+              this.clawPos.x - (mousePos.x - this.clawPos.x),
+              this.clawPos.y - (mousePos.y - this.clawPos.y)
+          );
+          
+          if (targetPos.distanceTo(this.clawPos) > maxDist) {
+              const dir = targetPos.clone().sub(this.clawPos).normalize();
+              targetPos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
+          }
+          
+          const baseVel = this.rigidBody.linvel();
+          const targetVx = (targetPos.x - basePos.x) * 14;
+          const targetVy = (targetPos.y - basePos.y) * 12;
+          
+          const lerpFactor = 0.2;
+          this.rigidBody.setLinvel({
+              x: baseVel.x + (targetVx - baseVel.x) * lerpFactor,
+              y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
+          }, true);
       }
     } else {
       // Attached state
