@@ -30,8 +30,8 @@ export class LightingSystem {
     canvas1.height = size;
     const ctx1 = canvas1.getContext('2d')!;
     const grd1 = ctx1.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-    grd1.addColorStop(0, "rgba(255, 200, 100, 0.04)");   // Dim core, so overlapping 8 times isn't overwhelming
-    grd1.addColorStop(0.3, "rgba(255, 130, 60, 0.02)");  // Soft orange spread
+    grd1.addColorStop(0, "rgba(255, 200, 100, 0.12)");   // Brighter core so shadows are deeply visible when blocked
+    grd1.addColorStop(0.3, "rgba(255, 130, 60, 0.06)");  // More distinct spread
     grd1.addColorStop(1, "rgba(80, 30, 20, 0.0)");       // Fade out smoothly
     ctx1.fillStyle = grd1;
     ctx1.fillRect(0, 0, size, size);

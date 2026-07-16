@@ -30,7 +30,7 @@ class Game {
   private lightingSystem!: LightingSystem;
 
   // Parallax Layers
-  private skyLayer!: PIXI.Container;
+
   private bgLayerFar!: PIXI.Container;
   private bgLayerMid!: PIXI.Container;
   private gameplayLayer!: PIXI.Container;
@@ -68,7 +68,7 @@ class Game {
     await this.app.init({ 
       width: window.innerWidth, 
       height: window.innerHeight, 
-      backgroundColor: 0xaa5533,
+      backgroundColor: 0x22110a,
       resizeTo: window,
       antialias: false
     });
@@ -99,7 +99,6 @@ class Game {
       adjustmentFilter
     ];
 
-    this.skyLayer = new PIXI.Container();
     this.sunLayer = new PIXI.Container();
     
     this.bgLayerFar = new PIXI.Container();
@@ -117,7 +116,6 @@ class Game {
         new PIXI.AlphaFilter({ alpha: 0.12 })
     ];
 
-    this.postProcessLayer.addChild(this.skyLayer);
     this.postProcessLayer.addChild(this.bgLayerFar);
     this.postProcessLayer.addChild(this.bgLayerMid);
     this.postProcessLayer.addChild(this.sunLayer);
