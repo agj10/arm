@@ -110,7 +110,7 @@ export class RobotArm {
     this.ropeJoint = world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
   }
 
-  public update(mousePos: Vec2, isMouseDown: boolean) {
+  public update(mousePos: Vec2, isMouseDown: boolean, isRightClick: boolean = false) {
     const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
     const basePos = this.rigidBody.translation();
 
@@ -123,8 +123,37 @@ export class RobotArm {
       this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
 
+      // SNAP: Right-click to instantly attach to nearby surface in mouse direction
+      if (isRightClick) {
+        const cPos = this.clawBody.translation();
+        const snapDir = new Vec2(mousePos.x - cPos.x, mousePos.y - cPos.y).normalize();
+        const snapRange = 15; // meters
+        const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, { x: snapDir.x, y: snapDir.y });
+        const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
+        const hit = this.world.castRay(ray, snapRange, true, filter);
+        
+        if (hit) {
+          const hitPoint = new Vec2(
+            cPos.x + snapDir.x * hit.timeOfImpact,
+            cPos.y + snapDir.y * hit.timeOfImpact
+          );
+          
+          // Get surface normal for proper claw orientation
+          const hitNormal = hit.normal(ray);
+          
+          this.isAttached = true;
+          this.clawPos.set(hitPoint.x, hitPoint.y);
+          this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
+          this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
+          this.clawBody.setLinvel({ x: 0, y: 0 }, true);
+          
+          const R = Math.atan2(-hitNormal.y, hitNormal.x) - Math.PI / 2;
+          this.clawBody.setRotation(-R, true);
+        }
+      }
+
       // Auto-attach on collision with any fixed geometry
-      if (this.detachCooldown <= 0) {
+      if (!this.isAttached && this.detachCooldown <= 0) {
           const cPos = this.clawBody.translation();
           const dirs = [{x:0,y:-1}, {x:0,y:1}, {x:-1,y:0}, {x:1,y:0}];
           let attachedPoint = null;

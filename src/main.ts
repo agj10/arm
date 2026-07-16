@@ -47,6 +47,7 @@ class Game {
 
   // Input & State
   private isMouseDown = false;
+  private isRightClickDown = false;
   private mousePos = new Vec2();
   private cameraPos = new Vec2(0, 0);
   private sunLayer!: PIXI.Container;
@@ -181,8 +182,11 @@ class Game {
         }
         this.targetZoom = Math.max(0.6, Math.min(1.5, this.targetZoom));
     });
-    window.addEventListener('mousedown', () => this.isMouseDown = true);
-    window.addEventListener('mouseup', () => this.isMouseDown = false);
+    window.addEventListener('mousedown', (e) => { if (e.button === 0) this.isMouseDown = true; });
+    window.addEventListener('mouseup', (e) => { if (e.button === 0) this.isMouseDown = false; });
+    window.addEventListener('mousedown', (e) => { if (e.button === 2) this.isRightClickDown = true; });
+    window.addEventListener('mouseup', (e) => { if (e.button === 2) this.isRightClickDown = false; });
+    window.addEventListener('contextmenu', (e) => e.preventDefault());
 
     this.app.ticker.add((ticker) => {
       this.animate(ticker.deltaMS);
@@ -229,7 +233,8 @@ class Game {
   private animate(deltaMS: number) {
     const deltaTime = Math.min(deltaMS / 1000, 0.1);
 
-    this.robotArm.update(this.mousePos, this.isMouseDown);
+    this.robotArm.update(this.mousePos, this.isMouseDown, this.isRightClickDown);
+    this.isRightClickDown = false; // Consume right click as a single event
     this.world.step();
     
     this.levelManager.update(deltaTime);
