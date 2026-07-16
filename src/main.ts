@@ -49,9 +49,17 @@ class Game {
   private isMouseDown = false;
   private isRightClickDown = false;
   private mousePos = new Vec2();
+  private rawMouseX = 0;
+  private rawMouseY = 0;
   private cameraPos = new Vec2(0, 0);
   private sunLayer!: PIXI.Container;
   private sunVisual!: PIXI.Sprite;
+
+  // Crosshair & Snap trails
+  private crosshair!: PIXI.Graphics;
+  private crosshairSnap!: PIXI.Graphics;
+  private uiLayer!: PIXI.Container;
+  private snapTrails: { gfx: PIXI.Graphics, alpha: number }[] = [];
 
   constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
@@ -161,6 +169,8 @@ class Game {
     this.createTestScene();
 
     window.addEventListener('mousemove', (e) => {
+      this.rawMouseX = e.clientX;
+      this.rawMouseY = e.clientY;
       const cx = window.innerWidth / 2;
       const cy = window.innerHeight / 2;
       const stageScale = 0.5;
@@ -191,6 +201,48 @@ class Game {
     this.app.ticker.add((ticker) => {
       this.animate(ticker.deltaMS);
     });
+
+    // Hide default cursor
+    document.body.style.cursor = 'none';
+    this.app.canvas.style.cursor = 'none';
+
+    // UI layer (screen-space, on top of everything)
+    this.uiLayer = new PIXI.Container();
+    this.app.stage.addChild(this.uiLayer);
+
+    // Normal crosshair (cyan +)
+    this.crosshair = new PIXI.Graphics();
+    this.drawCrosshair(this.crosshair);
+    this.uiLayer.addChild(this.crosshair);
+
+    // Snap-ready crosshair (diamond with inner dot)
+    this.crosshairSnap = new PIXI.Graphics();
+    this.drawSnapCrosshair(this.crosshairSnap);
+    this.crosshairSnap.visible = false;
+    this.uiLayer.addChild(this.crosshairSnap);
+  }
+
+  private drawCrosshair(g: PIXI.Graphics) {
+    g.setStrokeStyle({ width: 2, color: 0x00ffff, alpha: 0.9 });
+    // Horizontal line
+    g.moveTo(-12, 0).lineTo(-4, 0).stroke();
+    g.moveTo(4, 0).lineTo(12, 0).stroke();
+    // Vertical line
+    g.moveTo(0, -12).lineTo(0, -4).stroke();
+    g.moveTo(0, 4).lineTo(0, 12).stroke();
+    // Center dot
+    g.circle(0, 0, 1.5).fill({ color: 0x00ffff, alpha: 0.8 });
+  }
+
+  private drawSnapCrosshair(g: PIXI.Graphics) {
+    // Outer diamond
+    g.setStrokeStyle({ width: 2.5, color: 0x00ffff, alpha: 1.0 });
+    g.moveTo(0, -14).lineTo(14, 0).lineTo(0, 14).lineTo(-14, 0).closePath().stroke();
+    // Inner diamond
+    g.setStrokeStyle({ width: 1.5, color: 0x88ffff, alpha: 0.7 });
+    g.moveTo(0, -7).lineTo(7, 0).lineTo(0, 7).lineTo(-7, 0).closePath().stroke();
+    // Center dot
+    g.circle(0, 0, 2.5).fill({ color: 0x00ffff, alpha: 1.0 });
   }
 
   private createTestScene() {
@@ -322,6 +374,65 @@ class Game {
     this.bgLayerFar.scale.set(zoom);
     this.bgLayerFar.x = cx - this.cameraPos.x * ppm * zoom * 0.1 - 2500 * zoom;
     this.bgLayerFar.y = cy - (-this.cameraPos.y * ppm * zoom * 0.1) - 1000 * zoom;
+
+    // === Crosshair ===
+    const stageScaleUI = 0.5;
+    this.crosshair.position.set(this.rawMouseX / stageScaleUI, this.rawMouseY / stageScaleUI);
+    this.crosshairSnap.position.set(this.rawMouseX / stageScaleUI, this.rawMouseY / stageScaleUI);
+
+    // Check if snap target exists (raycast from claw toward mouse)
+    const cPos = this.robotArm.clawPos;
+    const dirX = this.mousePos.x - cPos.x;
+    const dirY = this.mousePos.y - cPos.y;
+    const dirLen = Math.sqrt(dirX * dirX + dirY * dirY);
+    let canSnap = false;
+    if (dirLen > 0.01) {
+      const ndx = dirX / dirLen;
+      const ndy = dirY / dirLen;
+      const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, { x: ndx, y: ndy });
+      const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
+      const hit = this.world.castRay(ray, 15, true, filter);
+      if (hit) canSnap = true;
+    }
+    this.crosshair.visible = !canSnap;
+    this.crosshairSnap.visible = canSnap;
+
+    // === Snap trail afterimage ===
+    if (this.robotArm.didSnap) {
+      const trail = new PIXI.Graphics();
+      const fx = this.robotArm.snapFrom.x * ppm;
+      const fy = -this.robotArm.snapFrom.y * ppm;
+      const tx = this.robotArm.snapTo.x * ppm;
+      const ty = -this.robotArm.snapTo.y * ppm;
+
+      // Draw a glowing line trail
+      trail.setStrokeStyle({ width: 6, color: 0x00ffff, alpha: 0.8 });
+      trail.moveTo(fx, fy).lineTo(tx, ty).stroke();
+      // Wider faint glow
+      trail.setStrokeStyle({ width: 16, color: 0x00ffff, alpha: 0.25 });
+      trail.moveTo(fx, fy).lineTo(tx, ty).stroke();
+      // Widest subtle glow
+      trail.setStrokeStyle({ width: 30, color: 0x0088ff, alpha: 0.1 });
+      trail.moveTo(fx, fy).lineTo(tx, ty).stroke();
+
+      // Small burst circles at start and end
+      trail.circle(fx, fy, 8).fill({ color: 0x00ffff, alpha: 0.5 });
+      trail.circle(tx, ty, 10).fill({ color: 0x00ffff, alpha: 0.7 });
+
+      this.gameplayLayer.addChild(trail);
+      this.snapTrails.push({ gfx: trail, alpha: 1.0 });
+    }
+
+    // Fade and remove old trails
+    for (let i = this.snapTrails.length - 1; i >= 0; i--) {
+      const t = this.snapTrails[i];
+      t.alpha -= deltaTime * 3; // Fade over ~0.33 seconds
+      t.gfx.alpha = t.alpha;
+      if (t.alpha <= 0) {
+        t.gfx.destroy();
+        this.snapTrails.splice(i, 1);
+      }
+    }
   }
 }
 

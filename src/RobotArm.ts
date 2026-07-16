@@ -25,6 +25,11 @@ export class RobotArm {
   private prevIsMouseDown: boolean = false;
   private detachCooldown: number = 0;
 
+  // Snap event data (consumed by main.ts each frame)
+  public didSnap: boolean = false;
+  public snapFrom: Vec2 = new Vec2();
+  public snapTo: Vec2 = new Vec2();
+
   private armBodies: RAPIER.RigidBody[] = [];
   private jointBodies: RAPIER.RigidBody[] = [];
 
@@ -124,8 +129,10 @@ export class RobotArm {
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
 
       // SNAP: Right-click to instantly attach to nearby surface in mouse direction
+      this.didSnap = false;
       if (isRightClick) {
         const cPos = this.clawBody.translation();
+        const snapOrigin = new Vec2(cPos.x, cPos.y);
         const snapDir = new Vec2(mousePos.x - cPos.x, mousePos.y - cPos.y).normalize();
         const snapRange = 15; // meters
         const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, { x: snapDir.x, y: snapDir.y });
@@ -142,6 +149,11 @@ export class RobotArm {
           this.clawPos.set(hitPoint.x, hitPoint.y);
           this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
           this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
+
+          // Record snap for trail effect
+          this.didSnap = true;
+          this.snapFrom.set(snapOrigin.x, snapOrigin.y);
+          this.snapTo.set(hitPoint.x, hitPoint.y);
           this.clawBody.setLinvel({ x: 0, y: 0 }, true);
           
           const R = Math.atan2(-hit.normal.y, hit.normal.x) - Math.PI / 2;
