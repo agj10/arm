@@ -86,11 +86,6 @@ class Game {
       brightness: 1.1,
     });
 
-    const noiseFilter = new PIXI.NoiseFilter({
-      noise: 0.04, // Breaks up color banding in the sky
-      seed: Math.random()
-    });
-
     this.postProcessLayer = new PIXI.Container();
     this.app.stage.addChild(this.postProcessLayer);
     this.postProcessLayer.filters = [
@@ -101,8 +96,7 @@ class Game {
         blur: 4,
         quality: 4
       }),
-      adjustmentFilter,
-      noiseFilter
+      adjustmentFilter
     ];
 
     this.skyLayer = new PIXI.Container();
@@ -259,10 +253,7 @@ class Game {
     const cx = (window.innerWidth / 2) / stageScale;
     const cy = (window.innerHeight / 2) / stageScale;
 
-    const noiseFilter = this.postProcessLayer.filters.find(f => f instanceof PIXI.NoiseFilter) as PIXI.NoiseFilter;
-    if (noiseFilter) {
-      noiseFilter.seed = Math.random();
-    }    const layers = [
+    const layers = [
       this.gameplayLayer, this.clawLayer, this.shadowLayer, 
       this.lightLayer, this.silhouetteLayer, this.levelMaskContainer,
       this.sunLayer
