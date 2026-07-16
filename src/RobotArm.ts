@@ -30,6 +30,9 @@ export class RobotArm {
   public snapFrom: Vec2 = new Vec2();
   public snapTo: Vec2 = new Vec2();
 
+  // Ghost pose: snapshot of all visual positions at one instant
+  public snapGhosts: { bodyPos: {x:number,y:number}, bodyRot: number, clawPos: {x:number,y:number}, clawRot: number, joints: {x:number,y:number}[] }[] = [];
+
   private armBodies: RAPIER.RigidBody[] = [];
   private jointBodies: RAPIER.RigidBody[] = [];
 
@@ -64,10 +67,10 @@ export class RobotArm {
     world.createCollider(clawColDesc, this.clawBody);
 
     this.clawMesh = new PIXI.Graphics();
-    this.clawMesh.roundRect(-15, -15, 30, 15, 4).fill(0x3a3a3a);
-    this.clawMesh.poly([-15, 0, -20, 25, -10, 25, -5, 0]).fill(0x5a5a5a);
-    this.clawMesh.poly([15, 0, 20, 25, 10, 25, 5, 0]).fill(0x5a5a5a);
-    this.clawMesh.circle(0, -5, 6).fill(0xee8822);
+    this.clawMesh.roundRect(-20, -20, 40, 20, 5).fill(0x3a3a3a);
+    this.clawMesh.poly([-20, 0, -30, 35, -15, 35, -5, 0]).fill(0x5a5a5a);
+    this.clawMesh.poly([20, 0, 30, 35, 15, 35, 5, 0]).fill(0x5a5a5a);
+    this.clawMesh.circle(0, -5, 8).fill(0xee8822);
     clawLayer.addChild(this.clawMesh);
 
     for (let i = 0; i < 3; i++) {
@@ -115,7 +118,10 @@ export class RobotArm {
     this.ropeJoint = world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
   }
 
-  public update(mousePos: Vec2, isMouseDown: boolean, isRightClick: boolean = false) {
+  public update(mousePos: Vec2, isMouseDown: boolean, isRightClick: boolean = false, isShiftDown: boolean = false) {
+    this.didSnap = false;
+    this.snapGhosts = [];
+    
     const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
     const basePos = this.rigidBody.translation();
 
@@ -129,34 +135,56 @@ export class RobotArm {
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
 
       // SNAP: Right-click to instantly attach to nearby surface in mouse direction
-      this.didSnap = false;
       if (isRightClick) {
         const cPos = this.clawBody.translation();
         const snapOrigin = new Vec2(cPos.x, cPos.y);
-        const snapDir = new Vec2(mousePos.x - cPos.x, mousePos.y - cPos.y).normalize();
-        const snapRange = 15; // meters
-        const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, { x: snapDir.x, y: snapDir.y });
-        const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
-        const hit = this.world.castRayAndGetNormal(ray, snapRange, true, filter);
+        const bodyOrigin = { x: basePos.x, y: basePos.y };
+        const bodyRotOrigin = this.rigidBody.rotation();
+        const clawRotOrigin = this.clawBody.rotation();
+        const snapTarget = this.getSnapTarget(mousePos);
         
-        if (hit) {
-          const hitPoint = new Vec2(
-            cPos.x + snapDir.x * hit.timeOfImpact,
-            cPos.y + snapDir.y * hit.timeOfImpact
-          );
+        if (snapTarget) {
+          const hitPoint = snapTarget.point;
+          const normalHit = snapTarget.normal;
+          
+          // Generate ghost poses along the snap path (sandevistan style)
+          const ghostCount = 5;
+          const jointsBackup = this.joints.map(j => new Vec2(j.x, j.y));
+          for (let g = 0; g < ghostCount; g++) {
+            const t = (g + 1) / (ghostCount + 1); // Skip 0 and 1
+            const interpClaw = new Vec2(
+              snapOrigin.x + (hitPoint.x - snapOrigin.x) * t,
+              snapOrigin.y + (hitPoint.y - snapOrigin.y) * t
+            );
+            const interpBody = {
+              x: bodyOrigin.x + (hitPoint.x - bodyOrigin.x) * t * 0.3, // Body lags behind
+              y: bodyOrigin.y + (hitPoint.y - bodyOrigin.y) * t * 0.3
+            };
+            // Solve IK for this interpolated pose
+            const ghostJoints = this.solveIKStatic(new Vec2(interpBody.x, interpBody.y), interpClaw);
+            this.snapGhosts.push({
+              bodyPos: interpBody,
+              bodyRot: bodyRotOrigin,
+              clawPos: { x: interpClaw.x, y: interpClaw.y },
+              clawRot: clawRotOrigin + (g / ghostCount) * 0.5,
+              joints: ghostJoints.map(j => ({ x: j.x, y: j.y }))
+            });
+          }
+          // Restore joints
+          for (let i = 0; i < this.joints.length; i++) this.joints[i].copy(jointsBackup[i]);
           
           this.isAttached = true;
           this.clawPos.set(hitPoint.x, hitPoint.y);
           this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
           this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
 
-          // Record snap for trail effect
           this.didSnap = true;
           this.snapFrom.set(snapOrigin.x, snapOrigin.y);
           this.snapTo.set(hitPoint.x, hitPoint.y);
           this.clawBody.setLinvel({ x: 0, y: 0 }, true);
           
-          const R = Math.atan2(-hit.normal.y, hit.normal.x) - Math.PI / 2;
+          // normalHit points AWAY from the wall. We want to face TOWARDS the wall.
+          const R = Math.atan2(normalHit.y, -normalHit.x) - Math.PI / 2;
           this.clawBody.setRotation(-R, true);
         }
       }
@@ -209,6 +237,10 @@ export class RobotArm {
               this.clawPos.y - (mousePos.y - this.clawPos.y)
           );
           
+          if (isShiftDown) {
+              targetPos = new Vec2(this.clawPos.x, this.clawPos.y - maxDist);
+          }
+          
           if (targetPos.distanceTo(this.clawPos) > maxDist) {
               const dir = targetPos.clone().sub(this.clawPos).normalize();
               targetPos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
@@ -245,6 +277,10 @@ export class RobotArm {
              this.clawPos.x - (mousePos.x - this.clawPos.x),
              this.clawPos.y - (mousePos.y - this.clawPos.y)
          );
+         
+         if (isShiftDown) {
+             targetPos = new Vec2(this.clawPos.x, this.clawPos.y - maxDist);
+         }
          
          if (targetPos.distanceTo(this.clawPos) > maxDist) {
              const dir = targetPos.clone().sub(this.clawPos).normalize();
@@ -374,5 +410,72 @@ export class RobotArm {
         this.jointBodies[i].setTranslation({ x: end.x, y: end.y }, true);
       }
     }
+  }
+
+  public getSnapTarget(mousePos: Vec2): { point: Vec2, normal: Vec2, toi: number } | null {
+    const cPos = this.clawBody.translation();
+    const snapDir = new Vec2(mousePos.x - cPos.x, mousePos.y - cPos.y);
+    const dirLen = snapDir.length();
+    if (dirLen < 0.01) return null;
+    snapDir.normalize();
+
+    const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
+    
+    // 1. Direct raycast
+    let ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, { x: snapDir.x, y: snapDir.y });
+    let hit = this.world.castRayAndGetNormal(ray, 30.0, true, filter);
+    
+    if (hit && hit.timeOfImpact > 0.1) {
+      return {
+        point: new Vec2(cPos.x + snapDir.x * hit.timeOfImpact, cPos.y + snapDir.y * hit.timeOfImpact),
+        normal: new Vec2(hit.normal.x, hit.normal.y),
+        toi: hit.timeOfImpact
+      };
+    }
+
+    return null;
+  }
+
+  /** Pure IK solver - returns joint positions without mutating state */
+  private solveIKStatic(base: Vec2, target: Vec2): Vec2[] {
+    const L = 2.5;
+    const maxDist = 3 * L;
+    let dist = base.distanceTo(target);
+    const t = target.clone();
+
+    if (dist > maxDist) {
+      const d = t.clone().sub(base).normalize();
+      t.copy(base.clone().add(d.multiplyScalar(maxDist)));
+      dist = maxDist;
+    }
+
+    const joints = [new Vec2(base.x, base.y), new Vec2(), new Vec2(), new Vec2(t.x, t.y)];
+
+    let dir = t.clone().sub(base);
+    if (dist < 0.001) {
+      dir.set(0, 1);
+      dist = 0.001;
+    } else {
+      dir.normalize();
+    }
+
+    if (dist >= maxDist - 0.01) {
+      joints[1].lerpVectors(base, t, 1/3);
+      joints[2].lerpVectors(base, t, 2/3);
+    } else {
+      const n1 = new Vec2(-dir.y, dir.x);
+      const cosTheta = Math.max(-1, Math.min(1, (dist - L) / (2 * L)));
+      const theta = Math.acos(cosTheta);
+
+      joints[1].set(
+        base.x + L * (dir.x * Math.cos(theta) + n1.x * Math.sin(theta)),
+        base.y + L * (dir.y * Math.cos(theta) + n1.y * Math.sin(theta))
+      );
+      joints[2].set(
+        t.x - L * dir.x * Math.cos(theta) + L * n1.x * Math.sin(theta),
+        t.y - L * dir.y * Math.cos(theta) + L * n1.y * Math.sin(theta)
+      );
+    }
+    return joints;
   }
 }

@@ -58,8 +58,11 @@ class Game {
   // Crosshair & Snap trails
   private crosshair!: PIXI.Graphics;
   private crosshairSnap!: PIXI.Graphics;
+  private crosshairGlow!: PIXI.Graphics;
+  private glowIntensity: number = 0;
+  private isShiftDown: boolean = false;
   private uiLayer!: PIXI.Container;
-  private snapTrails: { gfx: PIXI.Graphics, alpha: number }[] = [];
+  private snapGhosts: { container: PIXI.Container, filter?: PIXI.AlphaFilter, alpha: number, delay: number }[] = [];
 
   constructor(rapierModule: typeof RAPIER) {
     this.rapier = rapierModule;
@@ -143,7 +146,7 @@ class Game {
     this.shadowLayer.blendMode = 'multiply';
     this.postProcessLayer.addChild(this.shadowLayer);
 
-    const gravity = { x: 0.0, y: -60.0 };
+    const gravity = { x: 0.0, y: -30.0 };
     this.world = new this.rapier.World(gravity);
 
     this.lightingSystem = new LightingSystem(this.world, this.rapier);
@@ -198,6 +201,9 @@ class Game {
     window.addEventListener('mouseup', (e) => { if (e.button === 2) this.isRightClickDown = false; });
     window.addEventListener('contextmenu', (e) => e.preventDefault());
 
+    window.addEventListener('keydown', (e) => { if (e.key === 'Shift') this.isShiftDown = true; });
+    window.addEventListener('keyup', (e) => { if (e.key === 'Shift') this.isShiftDown = false; });
+
     this.app.ticker.add((ticker) => {
       this.animate(ticker.deltaMS);
     });
@@ -220,6 +226,22 @@ class Game {
     this.drawSnapCrosshair(this.crosshairSnap);
     this.crosshairSnap.visible = false;
     this.uiLayer.addChild(this.crosshairSnap);
+
+    // Click glow (crosshair shape burst)
+    this.crosshairGlow = new PIXI.Graphics();
+    
+    // Outer thick glow
+    this.crosshairGlow.setStrokeStyle({ width: 8, color: 0x00ffff, alpha: 0.3 });
+    this.crosshairGlow.moveTo(-16, 0).lineTo(16, 0).stroke();
+    this.crosshairGlow.moveTo(0, -16).lineTo(0, 16).stroke();
+    
+    // Inner bright glow
+    this.crosshairGlow.setStrokeStyle({ width: 4, color: 0x88ffff, alpha: 0.5 });
+    this.crosshairGlow.moveTo(-16, 0).lineTo(16, 0).stroke();
+    this.crosshairGlow.moveTo(0, -16).lineTo(0, 16).stroke();
+    
+    this.crosshairGlow.alpha = 0;
+    this.uiLayer.addChild(this.crosshairGlow);
   }
 
   private drawCrosshair(g: PIXI.Graphics) {
@@ -229,20 +251,20 @@ class Game {
     g.moveTo(4, 0).lineTo(12, 0).stroke();
     // Vertical line
     g.moveTo(0, -12).lineTo(0, -4).stroke();
-    g.moveTo(0, 4).lineTo(0, 12).stroke();
-    // Center dot
-    g.circle(0, 0, 1.5).fill({ color: 0x00ffff, alpha: 0.8 });
+    g.setStrokeStyle({ width: 3, color: 0x00ffff, alpha: 0.9 });
+    g.moveTo(-20, 0).lineTo(-8, 0).stroke();
+    g.moveTo(8, 0).lineTo(20, 0).stroke();
+    g.moveTo(0, -20).lineTo(0, -8).stroke();
+    g.moveTo(0, 8).lineTo(0, 20).stroke();
+    g.circle(0, 0, 2).fill({ color: 0x00ffff, alpha: 0.8 });
   }
 
   private drawSnapCrosshair(g: PIXI.Graphics) {
-    // Outer diamond
-    g.setStrokeStyle({ width: 2.5, color: 0x00ffff, alpha: 1.0 });
+    g.setStrokeStyle({ width: 3, color: 0x00ffff, alpha: 1.0 });
+    g.moveTo(0, -24).lineTo(24, 0).lineTo(0, 24).lineTo(-24, 0).closePath().stroke();
+    g.setStrokeStyle({ width: 2, color: 0x00ffff, alpha: 0.6 });
     g.moveTo(0, -14).lineTo(14, 0).lineTo(0, 14).lineTo(-14, 0).closePath().stroke();
-    // Inner diamond
-    g.setStrokeStyle({ width: 1.5, color: 0x88ffff, alpha: 0.7 });
-    g.moveTo(0, -7).lineTo(7, 0).lineTo(0, 7).lineTo(-7, 0).closePath().stroke();
-    // Center dot
-    g.circle(0, 0, 2.5).fill({ color: 0x00ffff, alpha: 1.0 });
+    g.circle(0, 0, 4).fill({ color: 0x00ffff, alpha: 1.0 });
   }
 
   private createTestScene() {
@@ -276,6 +298,13 @@ class Game {
 
     // Ceiling
     this.world.createCollider(this.rapier.ColliderDesc.cuboid(5000, 5).setCollisionGroups(0x00010003), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(0, 60)));
+
+    // Low ceiling obstacle
+    this.world.createCollider(this.rapier.ColliderDesc.cuboid(15, 2).setCollisionGroups(0x00010003), this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(40, 10)));
+    const lowCeilMesh = new PIXI.Graphics();
+    lowCeilMesh.rect((40 - 15) * 40, (-10 - 2) * 40, 30 * 40, 4 * 40).fill(0x3a3a3a);
+    this.gameplayLayer.addChild(lowCeilMesh);
+
     const cMask = new PIXI.Graphics();
     cMask.rect(-5000 * 40, -5 * 40, 10000 * 40, 10 * 40).fill(0xffffff);
     cMask.position.set(0, -60 * 40);
@@ -330,7 +359,7 @@ class Game {
   private animate(deltaMS: number) {
     const deltaTime = Math.min(deltaMS / 1000, 0.1);
 
-    this.robotArm.update(this.mousePos, this.isMouseDown, this.isRightClickDown);
+    this.robotArm.update(this.mousePos, this.isMouseDown, this.isRightClickDown, this.isShiftDown);
     this.isRightClickDown = false; // Consume right click as a single event
     this.world.step();
     
@@ -378,59 +407,83 @@ class Game {
     // === Crosshair ===
     const stageScaleUI = 0.5;
     this.crosshair.position.set(this.rawMouseX / stageScaleUI, this.rawMouseY / stageScaleUI);
-    this.crosshairSnap.position.set(this.rawMouseX / stageScaleUI, this.rawMouseY / stageScaleUI);
+    this.crosshairGlow.position.set(this.rawMouseX / stageScaleUI, this.rawMouseY / stageScaleUI);
+    this.crosshair.visible = true; // Always visible
 
-    // Check if snap target exists (raycast from claw toward mouse)
-    const cPos = this.robotArm.clawPos;
-    const dirX = this.mousePos.x - cPos.x;
-    const dirY = this.mousePos.y - cPos.y;
-    const dirLen = Math.sqrt(dirX * dirX + dirY * dirY);
-    let canSnap = false;
-    if (dirLen > 0.01) {
-      const ndx = dirX / dirLen;
-      const ndy = dirY / dirLen;
-      const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, { x: ndx, y: ndy });
-      const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
-      const hit = this.world.castRay(ray, 15, true, filter);
-      if (hit) canSnap = true;
-    }
-    this.crosshair.visible = !canSnap;
-    this.crosshairSnap.visible = canSnap;
-
-    // === Snap trail afterimage ===
-    if (this.robotArm.didSnap) {
-      const trail = new PIXI.Graphics();
-      const fx = this.robotArm.snapFrom.x * ppm;
-      const fy = -this.robotArm.snapFrom.y * ppm;
-      const tx = this.robotArm.snapTo.x * ppm;
-      const ty = -this.robotArm.snapTo.y * ppm;
-
-      // Draw a glowing line trail
-      trail.setStrokeStyle({ width: 6, color: 0x00ffff, alpha: 0.8 });
-      trail.moveTo(fx, fy).lineTo(tx, ty).stroke();
-      // Wider faint glow
-      trail.setStrokeStyle({ width: 16, color: 0x00ffff, alpha: 0.25 });
-      trail.moveTo(fx, fy).lineTo(tx, ty).stroke();
-      // Widest subtle glow
-      trail.setStrokeStyle({ width: 30, color: 0x0088ff, alpha: 0.1 });
-      trail.moveTo(fx, fy).lineTo(tx, ty).stroke();
-
-      // Small burst circles at start and end
-      trail.circle(fx, fy, 8).fill({ color: 0x00ffff, alpha: 0.5 });
-      trail.circle(tx, ty, 10).fill({ color: 0x00ffff, alpha: 0.7 });
-
-      this.gameplayLayer.addChild(trail);
-      this.snapTrails.push({ gfx: trail, alpha: 1.0 });
+    // Predict snap target using RobotArm
+    const snapTarget = this.robotArm.getSnapTarget(this.mousePos);
+    if (snapTarget) {
+      this.crosshairSnap.visible = true;
+      const screenX = window.innerWidth / 2 + (snapTarget.point.x * 40 - this.cameraPos.x * 40) * zoom;
+      const screenY = window.innerHeight / 2 + (-snapTarget.point.y * 40 - (-this.cameraPos.y * 40)) * zoom;
+      this.crosshairSnap.position.set(screenX / stageScaleUI, screenY / stageScaleUI);
+    } else {
+      this.crosshairSnap.visible = false;
     }
 
-    // Fade and remove old trails
-    for (let i = this.snapTrails.length - 1; i >= 0; i--) {
-      const t = this.snapTrails[i];
-      t.alpha -= deltaTime * 3; // Fade over ~0.33 seconds
-      t.gfx.alpha = t.alpha;
-      if (t.alpha <= 0) {
-        t.gfx.destroy();
-        this.snapTrails.splice(i, 1);
+    // Click glow effect
+    if (this.isMouseDown || this.isRightClickDown) {
+      this.glowIntensity = 1.0;
+    }
+    this.glowIntensity = Math.max(0, this.glowIntensity - deltaTime * 5);
+    this.crosshairGlow.alpha = this.glowIntensity;
+    this.crosshairGlow.scale.set(1 + this.glowIntensity * 0.5);
+
+    // === Snap ghost afterimages (sandevistan style) ===
+    if (this.robotArm.didSnap && this.robotArm.snapGhosts.length > 0) {
+      const ghosts = this.robotArm.snapGhosts;
+      for (let g = 0; g < ghosts.length; g++) {
+        const pose = ghosts[g];
+        const ghost = new PIXI.Container();
+        const gfx = new PIXI.Graphics();
+
+        // Body circle
+        gfx.circle(pose.bodyPos.x * ppm, -pose.bodyPos.y * ppm, 0.8 * ppm).fill(0x00ffff);
+
+        // Arm segments
+        for (let i = 0; i < 3; i++) {
+          const s = pose.joints[i];
+          const e = pose.joints[i + 1];
+          const sx = s.x * ppm, sy = -s.y * ppm;
+          const ex = e.x * ppm, ey = -e.y * ppm;
+          gfx.setStrokeStyle({ width: 0.5 * ppm, color: 0x00ffff });
+          gfx.moveTo(sx, sy).lineTo(ex, ey).stroke();
+
+          // Joint circles (between segments)
+          if (i < 2) {
+            gfx.circle(ex, ey, 0.4 * ppm).fill(0x00ffff);
+          }
+        }
+
+        // Claw
+        gfx.circle(pose.clawPos.x * ppm, -pose.clawPos.y * ppm, 0.6 * ppm).fill(0x00ffff);
+
+        ghost.addChild(gfx);
+        
+        const alphaFilter = new PIXI.AlphaFilter({ alpha: 0.15 });
+        ghost.filters = [
+          new GlowFilter({ distance: 10, outerStrength: 1.5, innerStrength: 0, color: 0x00ffff, quality: 0.2 }),
+          alphaFilter
+        ];
+        
+        this.gameplayLayer.addChild(ghost);
+        // Stagger the appearance: earlier ghosts start fading sooner
+        this.snapGhosts.push({ container: ghost, filter: alphaFilter, alpha: 0.15, delay: g * 100 });
+      }
+    }
+
+    // Fade and remove old ghosts (FIFO: earlier ones fade first)
+    for (let i = this.snapGhosts.length - 1; i >= 0; i--) {
+      const g = this.snapGhosts[i] as any;
+      if (g.delay > 0) {
+        g.delay -= deltaTime;
+        continue;
+      }
+      g.alpha -= deltaTime * 0.00015; // Smoothly fade out over 1000ms
+      g.filter.alpha = Math.max(0, g.alpha);
+      if (g.alpha <= 0) {
+        g.container.destroy();
+        this.snapGhosts.splice(i, 1);
       }
     }
   }
