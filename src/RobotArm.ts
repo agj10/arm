@@ -238,7 +238,7 @@ export class RobotArm {
           );
           
           if (isShiftDown) {
-              targetPos = new Vec2(this.clawPos.x, this.clawPos.y - maxDist);
+              targetPos = new Vec2(basePos.x, basePos.y);
           }
           
           if (targetPos.distanceTo(this.clawPos) > maxDist) {
@@ -247,7 +247,7 @@ export class RobotArm {
           }
           
           const baseVel = this.rigidBody.linvel();
-          const targetVx = (targetPos.x - basePos.x) * 4;
+          const targetVx = (targetPos.x - basePos.x) * 10;
           const targetVy = (targetPos.y - basePos.y) * 3;
           
           const lerpFactor = 0.08;
@@ -279,7 +279,7 @@ export class RobotArm {
          );
          
          if (isShiftDown) {
-             targetPos = new Vec2(this.clawPos.x, this.clawPos.y - maxDist);
+             targetPos = new Vec2(basePos.x, basePos.y);
          }
          
          if (targetPos.distanceTo(this.clawPos) > maxDist) {
@@ -288,7 +288,7 @@ export class RobotArm {
          }
          
          const baseVel = this.rigidBody.linvel();
-         const targetVx = (targetPos.x - basePos.x) * 14;
+         const targetVx = (targetPos.x - basePos.x) * 25;
          const targetVy = (targetPos.y - basePos.y) * 12;
          
          const lerpFactor = 0.2; 
