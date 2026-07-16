@@ -228,6 +228,51 @@ class Game {
     cMask.rect(-5000 * 40, -5 * 40, 10000 * 40, 10 * 40).fill(0xffffff);
     cMask.position.set(0, -60 * 40);
     this.levelMaskContainer.addChild(cMask);
+
+    // === TEST OBJECTS (temporary) ===
+    const addBlock = (x: number, y: number, hw: number, hh: number, color: number) => {
+      const body = this.world.createRigidBody(this.rapier.RigidBodyDesc.fixed().setTranslation(x, y));
+      this.world.createCollider(this.rapier.ColliderDesc.cuboid(hw, hh).setCollisionGroups(0x0001000b), body);
+      const vis = new PIXI.Graphics();
+      vis.rect(-hw * 40, -hh * 40, hw * 2 * 40, hh * 2 * 40).fill(color);
+      vis.position.set(x * 40, -y * 40);
+      this.gameplayLayer.addChild(vis);
+      const mask = new PIXI.Graphics();
+      mask.rect(-hw * 40, -hh * 40, hw * 2 * 40, hh * 2 * 40).fill(0xffffff);
+      mask.position.set(x * 40, -y * 40);
+      this.levelMaskContainer.addChild(mask);
+    };
+
+    // Small platforms at varying heights
+    addBlock(15, -7, 3, 0.5, 0x886644);   // Low platform near spawn
+    addBlock(30, -3, 2.5, 0.5, 0x886644); // Mid platform
+    addBlock(45, 2, 2, 0.5, 0x886644);    // Higher platform
+    addBlock(60, 8, 3, 0.5, 0x886644);    // High platform
+
+    // Tall pillar
+    addBlock(25, -5, 1, 5, 0x666666);
+
+    // Floating blocks for grappling
+    addBlock(50, 15, 2, 1, 0x555577);
+    addBlock(70, 20, 2, 1, 0x555577);
+    addBlock(90, 25, 2, 1, 0x555577);
+    addBlock(110, 30, 3, 1, 0x555577);
+
+    // Step formation
+    addBlock(130, -8, 2, 1, 0x775544);
+    addBlock(136, -4, 2, 1, 0x775544);
+    addBlock(142, 0, 2, 1, 0x775544);
+    addBlock(148, 4, 2, 1, 0x775544);
+
+    // Giant ceiling slab (for hanging and swinging)
+    addBlock(80, 40, 40, 2, 0x444466);
+
+    // Another giant ceiling further out
+    addBlock(200, 35, 50, 2, 0x444466);
+
+    // Narrow vertical walls to swing around
+    addBlock(160, 10, 0.5, 8, 0x666644);
+    addBlock(180, 10, 0.5, 8, 0x666644);
   }
 
   private animate(deltaMS: number) {

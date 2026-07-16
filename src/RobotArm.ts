@@ -130,7 +130,7 @@ export class RobotArm {
         const snapRange = 15; // meters
         const ray = new this.rapier.Ray({ x: cPos.x, y: cPos.y }, { x: snapDir.x, y: snapDir.y });
         const filter = this.rapier.QueryFilterFlags.EXCLUDE_DYNAMIC | this.rapier.QueryFilterFlags.EXCLUDE_KINEMATIC;
-        const hit = this.world.castRay(ray, snapRange, true, filter);
+        const hit = this.world.castRayAndGetNormal(ray, snapRange, true, filter);
         
         if (hit) {
           const hitPoint = new Vec2(
@@ -138,16 +138,13 @@ export class RobotArm {
             cPos.y + snapDir.y * hit.timeOfImpact
           );
           
-          // Get surface normal for proper claw orientation
-          const hitNormal = hit.normal(ray);
-          
           this.isAttached = true;
           this.clawPos.set(hitPoint.x, hitPoint.y);
           this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
           this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
           this.clawBody.setLinvel({ x: 0, y: 0 }, true);
           
-          const R = Math.atan2(-hitNormal.y, hitNormal.x) - Math.PI / 2;
+          const R = Math.atan2(-hit.normal.y, hit.normal.x) - Math.PI / 2;
           this.clawBody.setRotation(-R, true);
         }
       }
