@@ -30,9 +30,10 @@ export class LightingSystem {
     canvas1.height = size;
     const ctx1 = canvas1.getContext('2d')!;
     const grd1 = ctx1.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-    grd1.addColorStop(0, "rgba(255, 200, 100, 0.12)");   // Brighter core so shadows are deeply visible when blocked
-    grd1.addColorStop(0.3, "rgba(255, 130, 60, 0.06)");  // More distinct spread
-    grd1.addColorStop(1, "rgba(80, 30, 20, 0.0)");       // Fade out smoothly
+    grd1.addColorStop(0, "rgba(255, 220, 130, 0.08)");    // Brighter warm core
+    grd1.addColorStop(0.15, "rgba(255, 160, 80, 0.05)");  // Golden mid
+    grd1.addColorStop(0.4, "rgba(255, 130, 60, 0.03)");   // Soft orange spread
+    grd1.addColorStop(1, "rgba(120, 50, 30, 0.0)");       // Fade out smoothly
     ctx1.fillStyle = grd1;
     ctx1.fillRect(0, 0, size, size);
     this.lightTexture = PIXI.Texture.from(canvas1);
@@ -81,7 +82,7 @@ export class LightingSystem {
 
   public update(lightPos: Vec2) {
     const samples = 8;
-    const lightRadius = 0.4; // Small enough to avoid visible stepping, sunVisual handles visual size
+    const lightRadius = 1.5; // Large enough so the claw can't completely eclipse the light
     const maxPixelDist = this.maxDistance * 40;
     
     // Only exclude sensors (arm segment colliders) - let player body/claw cast shadows
