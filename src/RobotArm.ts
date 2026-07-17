@@ -253,10 +253,6 @@ export class RobotArm {
                   x: baseVel.x + (targetVx - baseVel.x) * lerpFactor,
                   y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
               }, true);
-          } else {
-              this.rigidBody.setGravityScale(0.0, true);
-              const baseVel = this.rigidBody.linvel();
-              this.rigidBody.setLinvel({ x: baseVel.x * 0.95, y: baseVel.y * 0.95 }, true);
           }
       }
     } else {

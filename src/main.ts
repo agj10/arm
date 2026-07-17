@@ -460,14 +460,15 @@ class Game {
 
         ghost.addChild(gfx);
         
-        ghost.alpha = 0.15;
+        const alphaFilter = new PIXI.AlphaFilter({ alpha: 0.15 });
         ghost.filters = [
-          new GlowFilter({ distance: 10, outerStrength: 1.5, innerStrength: 0, color: 0x00ffff, quality: 0.2 })
+          new GlowFilter({ distance: 10, outerStrength: 1.5, innerStrength: 0, color: 0x00ffff, quality: 0.2 }),
+          alphaFilter
         ];
         
         this.gameplayLayer.addChild(ghost);
-        // Add to persistent list for slow fade out
-        this.snapGhosts.push({ container: ghost, alpha: 0.15, delay: g * 0.06 });
+        // Stagger the appearance:        // Add to persistent list for slow fade out
+        this.snapGhosts.push({ container: ghost, filter: alphaFilter, alpha: 0.15, delay: g * 0.06 });
       }
     }
 
@@ -479,7 +480,7 @@ class Game {
         continue;
       }
       g.alpha -= deltaTime * 0.1; // Smoothly fade out over 1.5s
-      g.container.alpha = Math.max(0, g.alpha);
+      g.filter.alpha = Math.max(0, g.alpha);
       if (g.alpha <= 0) {
         g.container.destroy();
         this.snapGhosts.splice(i, 1);
