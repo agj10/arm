@@ -24,7 +24,6 @@ export class RobotArm {
   private isAttached: boolean = false;
   private prevIsMouseDown: boolean = false;
   private detachCooldown: number = 0;
-  private ropeJointActive: boolean = true;
 
   // Snap event data (consumed by main.ts each frame)
   public didSnap: boolean = false;
@@ -119,18 +118,6 @@ export class RobotArm {
     this.ropeJoint = world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
   }
 
-  private setRopeJointActive(active: boolean) {
-    if (active === this.ropeJointActive) return;
-    this.ropeJointActive = active;
-    if (!active) {
-      this.world.removeImpulseJoint(this.ropeJoint, true);
-    } else {
-      const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
-      const jointParams = this.rapier.JointData.rope(maxDist, {x:0, y:0}, {x:0, y:0});
-      this.ropeJoint = this.world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
-    }
-  }
-
   public update(mousePos: Vec2, isMouseDown: boolean, isRightClick: boolean = false, isShiftDown: boolean = false) {
     this.didSnap = false;
     this.snapGhosts = [];
@@ -144,8 +131,7 @@ export class RobotArm {
     }
 
     if (!this.isAttached) {
-      // Flying state - disconnect rope so body steering can't wiggle the claw
-      this.setRopeJointActive(false);
+      // Flying state
       this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
 
@@ -189,7 +175,6 @@ export class RobotArm {
           for (let i = 0; i < this.joints.length; i++) this.joints[i].copy(jointsBackup[i]);
           
           this.isAttached = true;
-          this.setRopeJointActive(true);
           this.clawPos.set(hitPoint.x, hitPoint.y);
           this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
           this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
@@ -227,7 +212,6 @@ export class RobotArm {
 
           if (attachedPoint && attachedNormal) { 
             this.isAttached = true;
-            this.setRopeJointActive(true);
             this.clawPos.set(attachedPoint.x, attachedPoint.y); 
             this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
             this.clawBody.setTranslation({ x: attachedPoint.x, y: attachedPoint.y }, true);
@@ -241,10 +225,6 @@ export class RobotArm {
       if (!this.isAttached) {
           const cPos = this.clawBody.translation();
           this.clawPos.set(cPos.x, cPos.y);
-          
-          // Kill angular velocity on both bodies to prevent spinning
-          this.clawBody.setAngvel(0, true);
-          this.rigidBody.setAngvel(0, true);
           
           const vel = this.clawBody.linvel();
           if (Math.abs(vel.x) > 0.1 || Math.abs(vel.y) > 0.1) {
@@ -274,20 +254,6 @@ export class RobotArm {
                   y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
               }, true);
           }
-          
-          // Clamp body within maxDist of claw (visual rope constraint without physics interference)
-          const curBase = this.rigidBody.translation();
-          const dx = curBase.x - this.clawPos.x;
-          const dy = curBase.y - this.clawPos.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist > maxDist) {
-              const scale = maxDist / dist;
-              this.rigidBody.setTranslation({
-                  x: this.clawPos.x + dx * scale,
-                  y: this.clawPos.y + dy * scale
-              }, true);
-          }
-
       }
     } else {
       // Attached state
@@ -298,19 +264,12 @@ export class RobotArm {
       if (this.prevIsMouseDown && !isMouseDown) {
          // Released! Detach and shoot claw!
          this.isAttached = false;
-         this.setRopeJointActive(false);
          this.detachCooldown = 15; 
          this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
          
-         // Combine body's swing momentum + aimed direction for natural launch
-         const bodyVel = this.rigidBody.linvel();
          const cPos = this.clawBody.translation();
          const dir = new Vec2(mousePos.x - cPos.x, mousePos.y - cPos.y).normalize();
-         const aimBoost = 150;
-         this.clawBody.setLinvel({
-             x: bodyVel.x * 1.5 + dir.x * aimBoost,
-             y: bodyVel.y * 1.5 + dir.y * aimBoost
-         }, true);
+         this.clawBody.setLinvel({ x: dir.x * 300, y: dir.y * 300 }, true);
       } else {
          // Follow point-symmetric target smoothly
          let targetPos = new Vec2(

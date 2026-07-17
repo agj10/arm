@@ -58,6 +58,7 @@ class Game {
   // Crosshair & Snap trails
   private crosshair!: PIXI.Graphics;
   private crosshairSnap!: PIXI.Graphics;
+  private snapLine!: PIXI.Graphics;
   private crosshairGlow!: PIXI.Graphics;
   private glowIntensity: number = 0;
   private isShiftDown: boolean = false;
@@ -226,6 +227,10 @@ class Game {
     this.drawSnapCrosshair(this.crosshairSnap);
     this.crosshairSnap.visible = false;
     this.uiLayer.addChild(this.crosshairSnap);
+
+    // Snap line (connects claw to snap crosshair)
+    this.snapLine = new PIXI.Graphics();
+    this.uiLayer.addChild(this.snapLine);
 
     // Click glow (crosshair shape burst)
     this.crosshairGlow = new PIXI.Graphics();
@@ -412,11 +417,21 @@ class Game {
 
     // Predict snap target using RobotArm
     const snapTarget = this.robotArm.getSnapTarget(this.mousePos);
+    this.snapLine.clear();
+    
     if (snapTarget) {
       this.crosshairSnap.visible = true;
       const uiX = cx + (snapTarget.point.x * ppm - this.cameraPos.x * ppm) * zoom;
       const uiY = cy + (-snapTarget.point.y * ppm - (-this.cameraPos.y * ppm)) * zoom;
       this.crosshairSnap.position.set(uiX, uiY);
+      
+      const clawUiX = cx + (this.robotArm.clawPos.x * ppm - this.cameraPos.x * ppm) * zoom;
+      const clawUiY = cy + (-this.robotArm.clawPos.y * ppm - (-this.cameraPos.y * ppm)) * zoom;
+      
+      this.snapLine.setStrokeStyle({ width: 1.5, color: 0x00ffff, alpha: 0.35 });
+      this.snapLine.moveTo(clawUiX, clawUiY);
+      this.snapLine.lineTo(uiX, uiY);
+      this.snapLine.stroke();
     } else {
       this.crosshairSnap.visible = false;
     }
