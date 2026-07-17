@@ -24,7 +24,6 @@ export class RobotArm {
   private isAttached: boolean = false;
   private prevIsMouseDown: boolean = false;
   private detachCooldown: number = 0;
-  private ropeJointActive: boolean = true;
 
   // Snap event data (consumed by main.ts each frame)
   public didSnap: boolean = false;
@@ -119,20 +118,6 @@ export class RobotArm {
     this.ropeJoint = world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
   }
 
-  private setRopeJointActive(active: boolean) {
-    if (active === this.ropeJointActive) return;
-    this.ropeJointActive = active;
-    if (!active) {
-      // Remove the joint
-      this.world.removeImpulseJoint(this.ropeJoint, true);
-    } else {
-      // Re-create the joint
-      const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
-      const jointParams = this.rapier.JointData.rope(maxDist, {x:0, y:0}, {x:0, y:0});
-      this.ropeJoint = this.world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
-    }
-  }
-
   public update(mousePos: Vec2, isMouseDown: boolean, isRightClick: boolean = false, isShiftDown: boolean = false) {
     this.didSnap = false;
     this.snapGhosts = [];
@@ -146,8 +131,7 @@ export class RobotArm {
     }
 
     if (!this.isAttached) {
-      // Flying state - disable rope joint to prevent pendulum spinning
-      this.setRopeJointActive(false);
+      // Flying state - rope joint stays active for natural swing physics
       this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
 
@@ -191,7 +175,6 @@ export class RobotArm {
           for (let i = 0; i < this.joints.length; i++) this.joints[i].copy(jointsBackup[i]);
           
           this.isAttached = true;
-          this.setRopeJointActive(true);
           this.clawPos.set(hitPoint.x, hitPoint.y);
           this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
           this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
@@ -229,7 +212,6 @@ export class RobotArm {
 
           if (attachedPoint && attachedNormal) { 
             this.isAttached = true;
-            this.setRopeJointActive(true);
             this.clawPos.set(attachedPoint.x, attachedPoint.y); 
             this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
             this.clawBody.setTranslation({ x: attachedPoint.x, y: attachedPoint.y }, true);
@@ -276,45 +258,7 @@ export class RobotArm {
                   y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
               }, true);
           }
-          
-          // === Manual rope tension: transfer body momentum to claw ===
-          // Instead of a physics rope joint (causes spinning), we manually
-          // calculate tension when the rope is taut and apply it to the claw.
-          const currentBasePos = this.rigidBody.translation();
-          const dx = currentBasePos.x - this.clawPos.x;
-          const dy = currentBasePos.y - this.clawPos.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          if (dist > maxDist * 0.7) {
-              // Rope is getting taut - apply tension force to claw
-              const tensionStrength = Math.min((dist - maxDist * 0.7) / (maxDist * 0.3), 1.0);
-              const nx = dx / dist;
-              const ny = dy / dist;
-              
-              // Pull claw toward body (transfers swing momentum)
-              const clawVel = this.clawBody.linvel();
-              const bodyVel = this.rigidBody.linvel();
-              
-              // Body's velocity component along the rope direction
-              const bodyAlongRope = bodyVel.x * nx + bodyVel.y * ny;
-              // Only apply tension when body is pulling AWAY from claw
-              if (bodyAlongRope > 0) {
-                  const pullForce = tensionStrength * bodyAlongRope * 0.8;
-                  this.clawBody.setLinvel({
-                      x: clawVel.x + nx * pullForce,
-                      y: clawVel.y + ny * pullForce
-                  }, true);
-              }
-          }
-          
-          // Hard clamp: if body drifts too far from claw, teleport it back
-          if (dist > maxDist) {
-              const scale = maxDist / dist;
-              this.rigidBody.setTranslation({
-                  x: this.clawPos.x + dx * scale,
-                  y: this.clawPos.y + dy * scale
-              }, true);
-          }
+
       }
     } else {
       // Attached state
