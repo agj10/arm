@@ -414,9 +414,9 @@ class Game {
     const snapTarget = this.robotArm.getSnapTarget(this.mousePos);
     if (snapTarget) {
       this.crosshairSnap.visible = true;
-      const screenX = window.innerWidth / 2 + (snapTarget.point.x * 40 - this.cameraPos.x * 40) * zoom;
-      const screenY = window.innerHeight / 2 + (-snapTarget.point.y * 40 - (-this.cameraPos.y * 40)) * zoom;
-      this.crosshairSnap.position.set(screenX / stageScaleUI, screenY / stageScaleUI);
+      const uiX = cx + (snapTarget.point.x * ppm - this.cameraPos.x * ppm) * zoom;
+      const uiY = cy + (-snapTarget.point.y * ppm - (-this.cameraPos.y * ppm)) * zoom;
+      this.crosshairSnap.position.set(uiX, uiY);
     } else {
       this.crosshairSnap.visible = false;
     }
