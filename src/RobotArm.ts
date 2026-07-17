@@ -266,7 +266,6 @@ export class RobotArm {
           }
           
           if (!isShiftDown) {
-              // Visually lerp body toward target (no physics joint pulling)
               const baseVel = this.rigidBody.linvel();
               const targetVx = (targetPos.x - basePos.x) * 10;
               const targetVy = (targetPos.y - basePos.y) * 3;
@@ -278,11 +277,37 @@ export class RobotArm {
               }, true);
           }
           
-          // Hard clamp: if body drifts too far from claw, teleport it back
+          // === Manual rope tension: transfer body momentum to claw ===
+          // Instead of a physics rope joint (causes spinning), we manually
+          // calculate tension when the rope is taut and apply it to the claw.
           const currentBasePos = this.rigidBody.translation();
           const dx = currentBasePos.x - this.clawPos.x;
           const dy = currentBasePos.y - this.clawPos.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist > maxDist * 0.7) {
+              // Rope is getting taut - apply tension force to claw
+              const tensionStrength = Math.min((dist - maxDist * 0.7) / (maxDist * 0.3), 1.0);
+              const nx = dx / dist;
+              const ny = dy / dist;
+              
+              // Pull claw toward body (transfers swing momentum)
+              const clawVel = this.clawBody.linvel();
+              const bodyVel = this.rigidBody.linvel();
+              
+              // Body's velocity component along the rope direction
+              const bodyAlongRope = bodyVel.x * nx + bodyVel.y * ny;
+              // Only apply tension when body is pulling AWAY from claw
+              if (bodyAlongRope > 0) {
+                  const pullForce = tensionStrength * bodyAlongRope * 0.8;
+                  this.clawBody.setLinvel({
+                      x: clawVel.x + nx * pullForce,
+                      y: clawVel.y + ny * pullForce
+                  }, true);
+              }
+          }
+          
+          // Hard clamp: if body drifts too far from claw, teleport it back
           if (dist > maxDist) {
               const scale = maxDist / dist;
               this.rigidBody.setTranslation({
