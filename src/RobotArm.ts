@@ -19,7 +19,7 @@ export class RobotArm {
   private rigidBody: RAPIER.RigidBody;
   private clawBody: RAPIER.RigidBody;
   // @ts-ignore
-  private ropeJoint: RAPIER.ImpulseJoint | null = null;
+  private ropeJoint: RAPIER.ImpulseJoint;
 
   private isAttached: boolean = false;
   private prevIsMouseDown: boolean = false;
@@ -113,18 +113,9 @@ export class RobotArm {
     }
 
     // Rope constraint between base and claw
-    this.setRopeJointActive(true);
-  }
-
-  private setRopeJointActive(active: boolean) {
-    if (active && !this.ropeJoint) {
-      const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
-      const jointParams = this.rapier.JointData.rope(maxDist, {x:0, y:0}, {x:0, y:0});
-      this.ropeJoint = this.world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
-    } else if (!active && this.ropeJoint) {
-      this.world.removeImpulseJoint(this.ropeJoint, true);
-      this.ropeJoint = null;
-    }
+    const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
+    const jointParams = rapierModule.JointData.rope(maxDist, {x:0, y:0}, {x:0, y:0});
+    this.ropeJoint = world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
   }
 
   public update(mousePos: Vec2, isMouseDown: boolean, isRightClick: boolean = false, isShiftDown: boolean = false) {
@@ -184,7 +175,6 @@ export class RobotArm {
           for (let i = 0; i < this.joints.length; i++) this.joints[i].copy(jointsBackup[i]);
           
           this.isAttached = true;
-          this.setRopeJointActive(true);
           this.clawPos.set(hitPoint.x, hitPoint.y);
           this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
           this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
@@ -222,7 +212,6 @@ export class RobotArm {
 
           if (attachedPoint && attachedNormal) { 
             this.isAttached = true;
-            this.setRopeJointActive(true);
             this.clawPos.set(attachedPoint.x, attachedPoint.y); 
             this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
             this.clawBody.setTranslation({ x: attachedPoint.x, y: attachedPoint.y }, true);
@@ -265,15 +254,6 @@ export class RobotArm {
                   y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
               }, true);
           }
-          
-          // Manually enforce maxDist since ropeJoint is disabled during flight!
-          const currentBasePos = this.rigidBody.translation();
-          const currentBaseVec = new Vec2(currentBasePos.x, currentBasePos.y);
-          if (currentBaseVec.distanceTo(this.clawPos) > maxDist) {
-              const dir = currentBaseVec.clone().sub(this.clawPos).normalize();
-              const newPos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
-              this.rigidBody.setTranslation({ x: newPos.x, y: newPos.y }, true);
-          }
       }
     } else {
       // Attached state
@@ -284,7 +264,6 @@ export class RobotArm {
       if (this.prevIsMouseDown && !isMouseDown) {
          // Released! Detach and shoot claw!
          this.isAttached = false;
-         this.setRopeJointActive(false);
          this.detachCooldown = 15; 
          this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
          
