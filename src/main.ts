@@ -467,8 +467,8 @@ class Game {
         ];
         
         this.gameplayLayer.addChild(ghost);
-        // Stagger the appearance: earlier ghosts start fading sooner
-        this.snapGhosts.push({ container: ghost, filter: alphaFilter, alpha: 0.15, delay: g * 100 });
+        // Stagger the appearance:        // Add to persistent list for slow fade out
+        this.snapGhosts.push({ container: ghost, filter: alphaFilter, alpha: 0.15, delay: g * 0.06 });
       }
     }
 

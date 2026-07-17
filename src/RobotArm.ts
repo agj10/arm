@@ -19,7 +19,7 @@ export class RobotArm {
   private rigidBody: RAPIER.RigidBody;
   private clawBody: RAPIER.RigidBody;
   // @ts-ignore
-  private ropeJoint: RAPIER.ImpulseJoint;
+  private ropeJoint: RAPIER.ImpulseJoint | null = null;
 
   private isAttached: boolean = false;
   private prevIsMouseDown: boolean = false;
@@ -113,14 +113,24 @@ export class RobotArm {
     }
 
     // Rope constraint between base and claw
-    const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
-    const jointParams = rapierModule.JointData.rope(maxDist, {x:0, y:0}, {x:0, y:0});
-    this.ropeJoint = world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
+    this.setRopeJointActive(true);
+  }
+
+  private setRopeJointActive(active: boolean) {
+    if (active && !this.ropeJoint) {
+      const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
+      const jointParams = this.rapier.JointData.rope(maxDist, {x:0, y:0}, {x:0, y:0});
+      this.ropeJoint = this.world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
+    } else if (!active && this.ropeJoint) {
+      this.world.removeImpulseJoint(this.ropeJoint, true);
+      this.ropeJoint = null;
+    }
   }
 
   public update(mousePos: Vec2, isMouseDown: boolean, isRightClick: boolean = false, isShiftDown: boolean = false) {
     this.didSnap = false;
     this.snapGhosts = [];
+    this.rigidBody.setGravityScale(1.0, true);
     
     const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
     const basePos = this.rigidBody.translation();
@@ -174,6 +184,7 @@ export class RobotArm {
           for (let i = 0; i < this.joints.length; i++) this.joints[i].copy(jointsBackup[i]);
           
           this.isAttached = true;
+          this.setRopeJointActive(true);
           this.clawPos.set(hitPoint.x, hitPoint.y);
           this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
           this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
@@ -211,6 +222,7 @@ export class RobotArm {
 
           if (attachedPoint && attachedNormal) { 
             this.isAttached = true;
+            this.setRopeJointActive(true);
             this.clawPos.set(attachedPoint.x, attachedPoint.y); 
             this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
             this.clawBody.setTranslation({ x: attachedPoint.x, y: attachedPoint.y }, true);
@@ -237,24 +249,31 @@ export class RobotArm {
               this.clawPos.y - (mousePos.y - this.clawPos.y)
           );
           
-          if (isShiftDown) {
-              targetPos = new Vec2(basePos.x, basePos.y);
-          }
-          
           if (targetPos.distanceTo(this.clawPos) > maxDist) {
               const dir = targetPos.clone().sub(this.clawPos).normalize();
               targetPos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
           }
           
-          const baseVel = this.rigidBody.linvel();
-          const targetVx = (targetPos.x - basePos.x) * 10;
-          const targetVy = (targetPos.y - basePos.y) * 3;
+          if (!isShiftDown) {
+              const baseVel = this.rigidBody.linvel();
+              const targetVx = (targetPos.x - basePos.x) * 10;
+              const targetVy = (targetPos.y - basePos.y) * 3;
+              
+              const lerpFactor = 0.08;
+              this.rigidBody.setLinvel({
+                  x: baseVel.x + (targetVx - baseVel.x) * lerpFactor,
+                  y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
+              }, true);
+          }
           
-          const lerpFactor = 0.08;
-          this.rigidBody.setLinvel({
-              x: baseVel.x + (targetVx - baseVel.x) * lerpFactor,
-              y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
-          }, true);
+          // Manually enforce maxDist since ropeJoint is disabled during flight!
+          const currentBasePos = this.rigidBody.translation();
+          const currentBaseVec = new Vec2(currentBasePos.x, currentBasePos.y);
+          if (currentBaseVec.distanceTo(this.clawPos) > maxDist) {
+              const dir = currentBaseVec.clone().sub(this.clawPos).normalize();
+              const newPos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
+              this.rigidBody.setTranslation({ x: newPos.x, y: newPos.y }, true);
+          }
       }
     } else {
       // Attached state
@@ -265,6 +284,7 @@ export class RobotArm {
       if (this.prevIsMouseDown && !isMouseDown) {
          // Released! Detach and shoot claw!
          this.isAttached = false;
+         this.setRopeJointActive(false);
          this.detachCooldown = 15; 
          this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
          
@@ -278,24 +298,26 @@ export class RobotArm {
              this.clawPos.y - (mousePos.y - this.clawPos.y)
          );
          
-         if (isShiftDown) {
-             targetPos = new Vec2(basePos.x, basePos.y);
-         }
-         
          if (targetPos.distanceTo(this.clawPos) > maxDist) {
              const dir = targetPos.clone().sub(this.clawPos).normalize();
              targetPos = this.clawPos.clone().add(dir.multiplyScalar(maxDist));
          }
          
-         const baseVel = this.rigidBody.linvel();
-         const targetVx = (targetPos.x - basePos.x) * 25;
-         const targetVy = (targetPos.y - basePos.y) * 12;
-         
-         const lerpFactor = 0.2; 
-         this.rigidBody.setLinvel({
-             x: baseVel.x + (targetVx - baseVel.x) * lerpFactor,
-             y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
-         }, true);
+         if (!isShiftDown) {
+             const baseVel = this.rigidBody.linvel();
+             const targetVx = (targetPos.x - basePos.x) * 25;
+             const targetVy = (targetPos.y - basePos.y) * 12;
+             
+             const lerpFactor = 0.2; 
+             this.rigidBody.setLinvel({
+                 x: baseVel.x + (targetVx - baseVel.x) * lerpFactor,
+                 y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
+             }, true);
+         } else {
+             // Freeze completely!
+             this.rigidBody.setGravityScale(0.0, true);
+             this.rigidBody.setLinvel({ x: 0, y: 0 }, true);
+         }
       }
     }
 
