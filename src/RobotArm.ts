@@ -24,6 +24,7 @@ export class RobotArm {
   private isAttached: boolean = false;
   private prevIsMouseDown: boolean = false;
   private detachCooldown: number = 0;
+  private ropeJointActive: boolean = true;
 
   // Snap event data (consumed by main.ts each frame)
   public didSnap: boolean = false;
@@ -118,6 +119,20 @@ export class RobotArm {
     this.ropeJoint = world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
   }
 
+  private setRopeJointActive(active: boolean) {
+    if (active === this.ropeJointActive) return;
+    this.ropeJointActive = active;
+    if (!active) {
+      // Remove the joint
+      this.world.removeImpulseJoint(this.ropeJoint, true);
+    } else {
+      // Re-create the joint
+      const maxDist = this.armLengths.reduce((a, b) => a + b, 0);
+      const jointParams = this.rapier.JointData.rope(maxDist, {x:0, y:0}, {x:0, y:0});
+      this.ropeJoint = this.world.createImpulseJoint(jointParams, this.rigidBody, this.clawBody, true);
+    }
+  }
+
   public update(mousePos: Vec2, isMouseDown: boolean, isRightClick: boolean = false, isShiftDown: boolean = false) {
     this.didSnap = false;
     this.snapGhosts = [];
@@ -131,7 +146,8 @@ export class RobotArm {
     }
 
     if (!this.isAttached) {
-      // Flying state
+      // Flying state - disable rope joint to prevent pendulum spinning
+      this.setRopeJointActive(false);
       this.clawBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
       this.rigidBody.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
 
@@ -175,6 +191,7 @@ export class RobotArm {
           for (let i = 0; i < this.joints.length; i++) this.joints[i].copy(jointsBackup[i]);
           
           this.isAttached = true;
+          this.setRopeJointActive(true);
           this.clawPos.set(hitPoint.x, hitPoint.y);
           this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
           this.clawBody.setTranslation({ x: hitPoint.x, y: hitPoint.y }, true);
@@ -212,6 +229,7 @@ export class RobotArm {
 
           if (attachedPoint && attachedNormal) { 
             this.isAttached = true;
+            this.setRopeJointActive(true);
             this.clawPos.set(attachedPoint.x, attachedPoint.y); 
             this.clawBody.setBodyType(this.rapier.RigidBodyType.KinematicPositionBased, true);
             this.clawBody.setTranslation({ x: attachedPoint.x, y: attachedPoint.y }, true);
@@ -225,6 +243,10 @@ export class RobotArm {
       if (!this.isAttached) {
           const cPos = this.clawBody.translation();
           this.clawPos.set(cPos.x, cPos.y);
+          
+          // Kill angular velocity on both bodies to prevent spinning
+          this.clawBody.setAngvel(0, true);
+          this.rigidBody.setAngvel(0, true);
           
           const vel = this.clawBody.linvel();
           if (Math.abs(vel.x) > 0.1 || Math.abs(vel.y) > 0.1) {
@@ -244,6 +266,7 @@ export class RobotArm {
           }
           
           if (!isShiftDown) {
+              // Visually lerp body toward target (no physics joint pulling)
               const baseVel = this.rigidBody.linvel();
               const targetVx = (targetPos.x - basePos.x) * 10;
               const targetVy = (targetPos.y - basePos.y) * 3;
@@ -252,6 +275,19 @@ export class RobotArm {
               this.rigidBody.setLinvel({
                   x: baseVel.x + (targetVx - baseVel.x) * lerpFactor,
                   y: baseVel.y + (targetVy - baseVel.y) * lerpFactor
+              }, true);
+          }
+          
+          // Hard clamp: if body drifts too far from claw, teleport it back
+          const currentBasePos = this.rigidBody.translation();
+          const dx = currentBasePos.x - this.clawPos.x;
+          const dy = currentBasePos.y - this.clawPos.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > maxDist) {
+              const scale = maxDist / dist;
+              this.rigidBody.setTranslation({
+                  x: this.clawPos.x + dx * scale,
+                  y: this.clawPos.y + dy * scale
               }, true);
           }
       }
